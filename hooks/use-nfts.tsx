@@ -40,13 +40,13 @@ const rabbitHoleAbi = [
 const DAILY_COOLDOWN = 86400 // 24 hours in seconds
 const GARDEN_CONTRACT_ADDRESS = "0x2940574AF75D350BF37Ceb73CA5dE8e5ADA425c4" as `0x${string}`
 
-// 🔥 ELITE LEVEL: Action History Events
+// 🔥 ELITE LEVEL: Action History Events - FIXED event signatures!
 const ACTION_EVENTS = {
   Transfer: parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)'),
-  CircleGrown: parseAbiItem('event CircleGrown(uint256 indexed tokenId, uint256 newSize)'),
-  CircleShrunk: parseAbiItem('event CircleShrunk(uint256 indexed tokenId, uint256 newSize)'),
+  CircleGrown: parseAbiItem('event CircleGrown(uint256 tokenId, uint256 newSize)'), // ✅ FIXED: tokenId NOT indexed
+  CircleShrunk: parseAbiItem('event CircleShrunk(uint256 tokenId, uint256 newSize)'), // ✅ FIXED: tokenId NOT indexed  
   CirclesMerged: parseAbiItem('event CirclesMerged(uint256[] mergedTokenIds, uint256 newTokenId, uint256 remainderTokenId)'),
-  SpecialMetadataSet: parseAbiItem('event SpecialMetadataSet(uint256 indexed tokenId, string metadata)'),
+  SpecialMetadataSet: parseAbiItem('event SpecialMetadataSet(uint256 tokenId, string metadata)'), // ✅ FIXED: tokenId NOT indexed
 } as const
 
 // Helper function with timeout
@@ -61,14 +61,11 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
 
 // 🎯 ELITE FUNCTION: Fetch comprehensive action history for a token
 async function fetchTokenHistory(tokenId: number): Promise<{ action: string; timestamp: number; txHash: string }[]> {
-  console.log(`🔍 FETCHING HISTORY FOR TOKEN #${tokenId}`)
   logger.debug(`Fetching action history for token #${tokenId}`)
   
   try {
     const publicClient = getPublicClient(wagmiConfig)
     const history: { action: string; timestamp: number; blockNumber: number; txHash: string }[] = []
-    
-    console.log(`🔍 PublicClient available:`, !!publicClient)
 
     // 📊 1. Fetch Transfer events (Mint, Transfers)
     const transferLogs = await withTimeout(
@@ -115,24 +112,25 @@ async function fetchTokenHistory(tokenId: number): Promise<{ action: string; tim
       }
     }
 
-    // 📊 2. Fetch CircleGrown events
+    // 📊 2. Fetch CircleGrown events (tokenId NOT indexed, need manual filter)
     try {
-      console.log(`🔍 Fetching GROW events for token #${tokenId}...`)
-      const grownLogs = await withTimeout(
+      const allGrownLogs = await withTimeout(
         publicClient!.getLogs({
           address: CONTRACT_ADDRESS,
           event: ACTION_EVENTS.CircleGrown,
-          args: { tokenId: BigInt(tokenId) },
           fromBlock: BigInt(0),
           toBlock: 'latest'
         }),
         12000
       )
 
-      console.log(`🔍 Token #${tokenId}: Found ${(grownLogs as any[]).length} grow events`)
-      logger.debug(`Token #${tokenId}: Found ${(grownLogs as any[]).length} grow events`)
-      for (const log of grownLogs as any[]) {
-        console.log(`🔍 Processing grow log:`, log)
+      // Filter for our specific tokenId (since tokenId is not indexed)
+      const relevantGrowLogs = (allGrownLogs as any[]).filter((log: any) => {
+        return Number(log.args.tokenId) === tokenId
+      })
+
+      logger.debug(`Token #${tokenId}: Found ${relevantGrowLogs.length} grow events from ${(allGrownLogs as any[]).length} total`)
+      for (const log of relevantGrowLogs) {
         const block = await publicClient!.getBlock({ blockNumber: log.blockNumber })
         history.push({
           action: `📈 Grown to size ${log.args.newSize}`,
@@ -142,28 +140,28 @@ async function fetchTokenHistory(tokenId: number): Promise<{ action: string; tim
         })
       }
     } catch (error) {
-      console.error(`💥 Error fetching grow events for token #${tokenId}:`, error)
       logger.warn(`Failed to fetch grow events for token #${tokenId}`, error)
     }
 
-    // 📊 3. Fetch CircleShrunk events  
+    // 📊 3. Fetch CircleShrunk events (tokenId NOT indexed, need manual filter)
     try {
-      console.log(`🔍 Fetching SHRINK events for token #${tokenId}...`)
-      const shrunkLogs = await withTimeout(
+      const allShrunkLogs = await withTimeout(
         publicClient!.getLogs({
           address: CONTRACT_ADDRESS,
           event: ACTION_EVENTS.CircleShrunk,
-          args: { tokenId: BigInt(tokenId) },
           fromBlock: BigInt(0),
           toBlock: 'latest'
         }),
         12000
       )
 
-      console.log(`🔍 Token #${tokenId}: Found ${(shrunkLogs as any[]).length} shrink events`)
-      logger.debug(`Token #${tokenId}: Found ${(shrunkLogs as any[]).length} shrink events`)
-      for (const log of shrunkLogs as any[]) {
-        console.log(`🔍 Processing shrink log:`, log)
+      // Filter for our specific tokenId (since tokenId is not indexed)
+      const relevantShrinkLogs = (allShrunkLogs as any[]).filter((log: any) => {
+        return Number(log.args.tokenId) === tokenId
+      })
+
+      logger.debug(`Token #${tokenId}: Found ${relevantShrinkLogs.length} shrink events from ${(allShrunkLogs as any[]).length} total`)
+      for (const log of relevantShrinkLogs) {
         const block = await publicClient!.getBlock({ blockNumber: log.blockNumber })
         history.push({
           action: `📉 Shrunk to size ${log.args.newSize}`,
@@ -173,7 +171,6 @@ async function fetchTokenHistory(tokenId: number): Promise<{ action: string; tim
         })
       }
     } catch (error) {
-      console.error(`💥 Error fetching shrink events for token #${tokenId}:`, error)
       logger.warn(`Failed to fetch shrink events for token #${tokenId}`, error)
     }
 
@@ -205,21 +202,25 @@ async function fetchTokenHistory(tokenId: number): Promise<{ action: string; tim
       logger.warn(`Failed to fetch merge events for token #${tokenId}`, error)
     }
 
-    // 📊 5. Fetch SpecialMetadataSet events
+    // 📊 5. Fetch SpecialMetadataSet events (tokenId NOT indexed, need manual filter)
     try {
-      const metadataLogs = await withTimeout(
+      const allMetadataLogs = await withTimeout(
         publicClient!.getLogs({
           address: CONTRACT_ADDRESS,
           event: ACTION_EVENTS.SpecialMetadataSet,
-          args: { tokenId: BigInt(tokenId) },
           fromBlock: BigInt(0),
           toBlock: 'latest'
         }),
         12000
       )
 
-      logger.debug(`Token #${tokenId}: Found ${(metadataLogs as any[]).length} metadata events`)
-      for (const log of metadataLogs as any[]) {
+      // Filter for our specific tokenId (since tokenId is not indexed)
+      const relevantMetadataLogs = (allMetadataLogs as any[]).filter((log: any) => {
+        return Number(log.args.tokenId) === tokenId
+      })
+
+      logger.debug(`Token #${tokenId}: Found ${relevantMetadataLogs.length} metadata events from ${(allMetadataLogs as any[]).length} total`)
+      for (const log of relevantMetadataLogs) {
         const block = await publicClient!.getBlock({ blockNumber: log.blockNumber })
         history.push({
           action: `🎨 Special metadata set (1/1 status)`,
@@ -232,47 +233,13 @@ async function fetchTokenHistory(tokenId: number): Promise<{ action: string; tim
       logger.warn(`Failed to fetch metadata events for token #${tokenId}`, error)
     }
 
-    // 🔍 ALTERNATIVE: If specific events fail, try fetching ALL events for this token
-    if (history.filter(h => !h.action.includes('Minted') && !h.action.includes('Transferred')).length === 0) {
-      console.log(`🔍 No grow/shrink events found with specific queries, trying ALL EVENTS approach...`)
-      try {
-        const allLogs = await withTimeout(
-          publicClient!.getLogs({
-            address: CONTRACT_ADDRESS,
-            fromBlock: BigInt(0),
-            toBlock: 'latest'
-          }),
-          15000
-        )
-        
-        console.log(`🔍 Found ${allLogs.length} total events on contract`)
-        const relevantLogs = allLogs.filter((log: any) => {
-          // Filter for events that mention our tokenId
-          if (!log.topics || log.topics.length === 0) return false
-          
-          // Check if any topic contains our tokenId (events index tokenId differently)
-          const tokenIdHex = '0x' + tokenId.toString(16).padStart(64, '0')
-          return log.topics.some((topic: string) => topic.toLowerCase() === tokenIdHex.toLowerCase())
-        })
-        
-        console.log(`🔍 Found ${relevantLogs.length} events potentially related to token #${tokenId}`)
-        for (const log of relevantLogs) {
-          console.log(`🔍 Relevant log:`, log)
-        }
-      } catch (altError) {
-        console.error(`💥 Alternative approach also failed:`, altError)
-      }
-    }
-
     // Sort by block number (chronological order)
     const sortedHistory = history.sort((a, b) => a.blockNumber - b.blockNumber)
 
-    console.log(`🔍 FINAL HISTORY for token #${tokenId}:`, sortedHistory)
-    logger.debug(`Token #${tokenId} history: ${sortedHistory.length} actions`)
+    logger.debug(`Token #${tokenId} history: ${sortedHistory.length} actions found`)
     return sortedHistory
 
   } catch (error) {
-    console.error(`💥 MAJOR ERROR fetching history for token #${tokenId}:`, error)
     logger.error(`Error fetching history for token #${tokenId}`, error)
     return []
   }
