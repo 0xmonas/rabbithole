@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import Image from "next/image"
 import { ConnectButton } from "@/components/connect-button"
 import { NFTGallery } from "@/components/nft-gallery"
 import { NFTDetail } from "@/components/nft-detail"
@@ -116,12 +117,16 @@ function RabbitHoleAppInner() {
       {/* Header */}
       <header className="border-b border-black p-4">
         <div className="container mx-auto flex justify-between items-center">
-          <div className="flex items-center space-x-8">
+          <div className="flex items-center space-x-3">
             <h1 className="text-2xl font-bold">RABBIT HOLE</h1>
-            <div className="hidden md:flex space-x-4">
-              <span>circle</span>
-              <span>management</span>
-              <span>system</span>
+            <div className="hidden md:block">
+              <Image
+                src="/rabbithole.png"
+                alt="Rabbit Hole Logo"
+                width={32}
+                height={32}
+                className="object-contain"
+              />
             </div>
           </div>
 

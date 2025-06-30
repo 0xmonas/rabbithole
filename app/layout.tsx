@@ -11,7 +11,9 @@ export const metadata: Metadata = {
   description: "An onchain experiment by Monas",
   generator: 'v0.dev',
   icons: {
-    icon: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzIiIGhlaWdodD0iMzIiIHZpZXdCb3g9IjAgMCAzMiAzMiIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPGNpcmNsZSBjeD0iMTYiIGN5PSIxNiIgcj0iMTIiIGZpbGw9IiMwMDAwMDAiLz4KPHN2Zz4='
+    icon: '/rabbithole.png',
+    shortcut: '/rabbithole.png',
+    apple: '/rabbithole.png',
   }
 }
 

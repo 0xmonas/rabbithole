@@ -1,6 +1,6 @@
 "use client"
 
-import { OPENSEA_URL } from "@/config/wagmi"
+const OPENSEA_URL = "https://opensea.io/collection/rabbit-hole-shape"
 
 interface OpenSeaRedirectProps {
   large?: boolean
