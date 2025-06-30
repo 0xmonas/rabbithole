@@ -5,6 +5,7 @@ import { readContract, writeContract, getPublicClient } from "@wagmi/core"
 import { wagmiConfig } from "@/config/wagmi"
 import { parseAbiItem, getAddress } from "viem"
 import type { NFT } from "@/types/nft"
+import { logger } from "@/lib/logger"
 
 // Garden contract address and ABI - FIXED CHECKSUM
 const GARDEN_CONTRACT_ADDRESS = getAddress("0x2940574AF75D350BF37Ceb73CA5dE8e5ADA425c4")
@@ -88,20 +89,21 @@ export function useGarden(address: string | null) {
   // 🌱 Fetch Garden NFTs for user
   const fetchGardenNFTs = async () => {
     if (!address) {
-      console.log("🌱 No address provided to fetchGardenNFTs")
+      logger.debug("No address provided to fetchGardenNFTs")
       setGardenNFTs([])
       return
     }
 
-    console.log("🌱 Fetching Garden NFTs for:", address)
-    console.log("🌱 Garden Contract:", GARDEN_CONTRACT_ADDRESS)
-    console.log("🌱 RH Contract:", RH_CONTRACT_ADDRESS)
+    logger.info("Fetching Garden NFTs")
+    logger.debug("Garden Contract address", { garden: GARDEN_CONTRACT_ADDRESS })
+    logger.debug("RH Contract address", { rh: RH_CONTRACT_ADDRESS })
+    logger.debug("Target address", { address })
     setLoading(true)
 
     try {
       // Get user's planted seeds using Transfer events
       const publicClient = getPublicClient(wagmiConfig)
-      console.log("🌱 PublicClient:", publicClient ? "Available" : "Not available")
+      logger.debug("PublicClient status", { available: !!publicClient })
       
       // 🔍 DETAILED TRANSFER ANALYSIS - Let's see ALL transfers involving this address
       console.log("🔍 ANALYZING ALL TRANSFERS FOR ADDRESS:", address)

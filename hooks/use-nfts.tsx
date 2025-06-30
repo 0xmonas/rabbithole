@@ -5,6 +5,7 @@ import { readContract, getPublicClient } from "@wagmi/core"
 import { wagmiConfig, CONTRACT_ADDRESS } from "@/config/wagmi"
 import { parseAbiItem } from "viem"
 import type { NFT } from "@/types/nft"
+import { logger } from "@/lib/logger"
 
 // ABI for the RabbitHole contract
 const rabbitHoleAbi = [
@@ -59,7 +60,7 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
 
 // 🎯 ELITE FUNCTION: Fetch comprehensive action history for a token
 async function fetchTokenHistory(tokenId: number): Promise<{ action: string; timestamp: number; txHash: string }[]> {
-  console.log(`🔍 Fetching action history for token #${tokenId}`)
+  logger.debug(`Fetching action history for token #${tokenId}`)
   
   try {
     const publicClient = getPublicClient(wagmiConfig)
@@ -140,7 +141,7 @@ async function fetchTokenHistory(tokenId: number): Promise<{ action: string; tim
       })
     }
 
-    // 📊 4. Fetch CirclesMerged events (where this token was created)
+    // 📊 4. Fetch CirclesMerged events (as source)
     const mergedLogs = await withTimeout(
       publicClient!.getLogs({
         address: CONTRACT_ADDRESS,
@@ -152,26 +153,14 @@ async function fetchTokenHistory(tokenId: number): Promise<{ action: string; tim
     )
 
     for (const log of mergedLogs as any[]) {
-      // Check if this token was created from a merge
-      if (Number(log.args.newTokenId) === tokenId || Number(log.args.remainderTokenId) === tokenId) {
+      if (log.args.mergedTokenIds.includes(BigInt(tokenId))) {
         const block = await publicClient!.getBlock({ blockNumber: log.blockNumber })
-        const mergedIds = log.args.mergedTokenIds.map((id: any) => Number(id)).join(', ')
-        
-        if (Number(log.args.newTokenId) === tokenId) {
-          history.push({
-            action: `Created by merging tokens [${mergedIds}]`,
-            timestamp: Number(block.timestamp),
-            blockNumber: Number(log.blockNumber),
-            txHash: log.transactionHash
-          })
-        } else {
-          history.push({
-            action: `Created as remainder from merging tokens [${mergedIds}]`,
-            timestamp: Number(block.timestamp),
-            blockNumber: Number(log.blockNumber),
-            txHash: log.transactionHash
-          })
-        }
+        history.push({
+          action: `Merged with other tokens → Token #${log.args.newTokenId}`,
+          timestamp: Number(block.timestamp),
+          blockNumber: Number(log.blockNumber),
+          txHash: log.transactionHash
+        })
       }
     }
 
@@ -190,34 +179,33 @@ async function fetchTokenHistory(tokenId: number): Promise<{ action: string; tim
     for (const log of metadataLogs as any[]) {
       const block = await publicClient!.getBlock({ blockNumber: log.blockNumber })
       history.push({
-        action: `Special metadata set (1/1 status achieved)`,
+        action: `Special metadata set (1/1 status)`,
         timestamp: Number(block.timestamp),
         blockNumber: Number(log.blockNumber),
         txHash: log.transactionHash
       })
     }
 
-    // 🔥 ELITE SORTING: Sort by block number then timestamp
-    const sortedHistory = history
-      .sort((a, b) => a.blockNumber - b.blockNumber || a.timestamp - b.timestamp)
-      .map(({ action, timestamp, txHash }) => ({ action, timestamp, txHash }))
+    // Sort by block number (chronological order)
+    const sortedHistory = history.sort((a, b) => a.blockNumber - b.blockNumber)
 
-    console.log(`📋 Token #${tokenId} history: ${sortedHistory.length} actions`)
+    logger.debug(`Token #${tokenId} history: ${sortedHistory.length} actions`)
     return sortedHistory
 
   } catch (error) {
-    console.error(`💥 Error fetching history for token #${tokenId}:`, error)
+    logger.error(`Error fetching history for token #${tokenId}`, error)
     return []
   }
 }
 
 export function useNFTs(address: string | null) {
   const [nfts, setNFTs] = useState<NFT[]>([])
-  const [loading, setLoading] = useState(true)
+  const [isLoading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const fetchNFTData = async (tokenId: number): Promise<NFT | null> => {
     try {
-      // 1. Fetch basic token data
+      // Get circle data from contract
       const tokenInfo = await withTimeout(
         readContract(wagmiConfig, {
           address: CONTRACT_ADDRESS,
@@ -228,7 +216,7 @@ export function useNFTs(address: string | null) {
         5000
       )
 
-      // 2. Fetch token URI and extract image
+      // Get token image from contract's tokenURI
       let imageUrl: string | undefined
       try {
         const tokenURI = await withTimeout(
@@ -241,58 +229,52 @@ export function useNFTs(address: string | null) {
           5000
         ) as string
 
-        // Parse Base64-encoded JSON metadata
+        // Parse Base64-encoded JSON metadata to extract SVG
         if (tokenURI.startsWith('data:application/json;base64,')) {
           const base64Data = tokenURI.replace('data:application/json;base64,', '')
           const jsonData = atob(base64Data)
           const metadata = JSON.parse(jsonData)
           
           if (metadata.image) {
-            imageUrl = metadata.image // This is already a data URL: "data:image/svg+xml;base64,..."
-            console.log(`🖼️ Token #${tokenId} image URL extracted from contract`)
+            imageUrl = metadata.image
+            logger.debug(`Token #${tokenId} image extracted from contract`)
           }
         }
       } catch (error) {
-        console.warn(`⚠️ Could not fetch image for token #${tokenId}:`, error)
+        logger.warn(`Could not fetch image for token #${tokenId}`, error)
       }
 
-      // Calculate cooldowns
-      const now = Math.floor(Date.now() / 1000)
-      const lastGrowTime = Number(tokenInfo[1])
-      const lastShrinkTime = Number(tokenInfo[2])
-      const growTimeElapsed = now - lastGrowTime
-      const shrinkTimeElapsed = now - lastShrinkTime
-
-      // 3. 🔥 ELITE FEATURE: Fetch comprehensive action history
+      // Fetch comprehensive action history
       const history = await fetchTokenHistory(tokenId)
 
+      const now = Math.floor(Date.now() / 1000)
+      const lastGrowTime = Number((tokenInfo as any)[0])
+      const lastShrinkTime = Number((tokenInfo as any)[1])
+
       return {
-        id: Number(tokenId),
-        size: Number(tokenInfo[0]),
+        id: tokenId,
+        size: Number((tokenInfo as any)[0]),
         minSize: 1,
         maxSize: 1000,
-        lastGrowTime: lastGrowTime,
-        lastShrinkTime: lastShrinkTime,
-        growCooldownRemaining:
-          lastGrowTime === 0 ? 0 : growTimeElapsed >= DAILY_COOLDOWN ? 0 : DAILY_COOLDOWN - growTimeElapsed,
-        shrinkCooldownRemaining:
-          lastShrinkTime === 0 ? 0 : shrinkTimeElapsed >= DAILY_COOLDOWN ? 0 : DAILY_COOLDOWN - shrinkTimeElapsed,
-        imageUrl: imageUrl, // 🎯 REAL CONTRACT-GENERATED IMAGE!
-        history: history, // 🎯 REAL ACTION HISTORY with transaction hashes!
+        lastGrowTime: Number((tokenInfo as any)[1]),
+        lastShrinkTime: Number((tokenInfo as any)[2]),
+        growCooldownRemaining: Math.max(0, (lastGrowTime + DAILY_COOLDOWN) - now),
+        shrinkCooldownRemaining: Math.max(0, (lastShrinkTime + DAILY_COOLDOWN) - now),
+        imageUrl,
+        history
       }
     } catch (error) {
-      console.error(`💥 Error fetching data for token ${tokenId}:`, error)
+      logger.error(`Error fetching data for token #${tokenId}`, error)
       return null
     }
   }
 
-  const fetchNFTs = async () => {
-    console.log("🚀 PROFESSIONAL NFT FETCHING - Using Transfer Events")
-    console.log("🔍 Address:", address)
-    console.log("🔍 Contract:", CONTRACT_ADDRESS)
+  const fetchAllNFTs = async () => {
+    logger.info("Starting professional NFT fetching using Transfer Events")
+    logger.debug("Fetching for address", { address })
     
     if (!address) {
-      console.log("❌ No address provided")
+      logger.debug("No address provided")
       setNFTs([])
       setLoading(false)
       return
@@ -301,7 +283,7 @@ export function useNFTs(address: string | null) {
     setLoading(true)
 
     try {
-      console.log("⚡ Step 1: Check balance for validation")
+      logger.info("Step 1: Check balance for validation")
       
       // Quick balance check for validation
       const balance = await withTimeout(
@@ -314,7 +296,7 @@ export function useNFTs(address: string | null) {
         5000
       )
 
-      console.log(`✅ Balance: ${balance} NFTs`)
+      logger.debug(`Balance: ${balance} NFTs`)
 
       if (Number(balance) === 0) {
         setNFTs([])
@@ -322,7 +304,7 @@ export function useNFTs(address: string | null) {
         return
       }
 
-      console.log("🔥 Step 2: PROFESSIONAL APPROACH - Query Transfer Events")
+      logger.info("Step 2: Query Transfer Events")
       
       // Query Transfer events - this is how REAL NFT dApps work!
       // Transfer(address from, address to, uint256 tokenId)
@@ -341,7 +323,7 @@ export function useNFTs(address: string | null) {
         10000 // 10 seconds for all logs
       )
 
-      console.log(`📊 Found ${(transferLogs as any[]).length} Transfer events TO this address`)
+      logger.debug(`Found ${(transferLogs as any[]).length} Transfer events TO this address`)
 
       // Get tokens that were transferred OUT of this address  
       const transferOutLogs = await withTimeout(
@@ -357,7 +339,7 @@ export function useNFTs(address: string | null) {
         10000
       )
 
-      console.log(`📊 Found ${(transferOutLogs as any[]).length} Transfer events FROM this address`)
+      logger.debug(`Found ${(transferOutLogs as any[]).length} Transfer events FROM this address`)
 
       // Calculate current owned tokens
       const tokensReceived = new Set((transferLogs as any[]).map((log: any) => Number(log.args.tokenId)))
@@ -366,45 +348,48 @@ export function useNFTs(address: string | null) {
       // Current owned = received - sent
       const ownedTokenIds = Array.from(tokensReceived).filter(tokenId => !tokensSent.has(tokenId))
       
-      console.log(`🎯 RESULT: Currently owns ${ownedTokenIds.length} tokens: [${ownedTokenIds.join(", ")}]`)
-      console.log(`📈 Received: [${Array.from(tokensReceived).join(", ")}]`)
-      console.log(`📉 Sent: [${Array.from(tokensSent).join(", ")}]`)
+      logger.debug(`Currently owns ${ownedTokenIds.length} tokens`, { 
+        received: Array.from(tokensReceived), 
+        sent: Array.from(tokensSent),
+        owned: ownedTokenIds 
+      })
 
       if (ownedTokenIds.length === 0) {
-        console.log("❌ No tokens currently owned")
+        logger.info("No tokens currently owned")
         setNFTs([])
         setLoading(false)
         return
       }
 
-      console.log("💎 Step 3: Batch fetch NFT data + ELITE ACTION HISTORY for owned tokens")
+      logger.info("Step 3: Batch fetch NFT data with action history for owned tokens")
       
       // Fetch all NFT data in parallel - MUCH faster!
       const nftPromises = ownedTokenIds.map(tokenId => fetchNFTData(tokenId))
       const nftResults = await Promise.all(nftPromises)
       const validNFTs = nftResults.filter((nft): nft is NFT => nft !== null)
 
-      console.log(`🎉 SUCCESS: Loaded ${validNFTs.length} NFTs with complete action history!`)
-      console.log("📋 NFTs:", validNFTs.map(nft => `#${nft.id} (size: ${nft.size}, ${nft.history?.length || 0} actions)`).join(", "))
-      
-      setNFTs(validNFTs)
+      logger.success(`Loaded ${validNFTs.length} NFTs with complete action history`)
+      logger.debug("NFTs loaded", { nfts: validNFTs.map(nft => `#${nft.id} (size: ${nft.size}, ${nft.history?.length || 0} actions)`) })
 
-    } catch (error) {
-      console.error("💥 Error in professional NFT fetching:", error)
-      console.log("🔄 Fallback: Event queries might not be supported on this RPC")
+      setNFTs(validNFTs)
+      setError(null)
+
+    } catch (error: any) {
+      logger.error("Event queries might not be supported on this RPC", error)
+      
+      // Graceful fallback - don't break the UI
       setNFTs([])
+      setError("Unable to load NFTs. Please try refreshing or check your connection.")
     } finally {
       setLoading(false)
     }
   }
 
-  // Fetch NFTs when address changes
   useEffect(() => {
-    console.log("🔄 Address changed to:", address)
-    setNFTs([])
-    fetchNFTs()
+    logger.debug("Address changed", { newAddress: address })
+    fetchAllNFTs()
   }, [address])
 
-  return { nfts, loading, refreshNFTs: fetchNFTs }
+  return { nfts, isLoading, error, refreshNFTs: fetchAllNFTs }
 }
 

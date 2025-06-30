@@ -76,25 +76,50 @@ const ChartStyle = ({ id, config }: { id: string; config: ChartConfig }) => {
     return null
   }
 
+  // Security: Sanitize CSS to prevent XSS
+  const sanitizeCSS = (css: string): string => {
+    return css
+      // Remove potentially dangerous characters
+      .replace(/[<>'"]/g, '')
+      // Remove javascript: and data: URLs
+      .replace(/javascript:/gi, '')
+      .replace(/data:/gi, '')
+      // Remove @import and other dangerous CSS rules
+      .replace(/@import/gi, '')
+      .replace(/expression/gi, '')
+      // Keep only safe CSS characters
+      .replace(/[^\w\s\-#%.():;,]/g, '')
+  }
+
+  const generateSafeCSS = () => {
+    return Object.entries(THEMES)
+      .map(([theme, prefix]) => {
+        const rules = colorConfig
+          .map(([key, itemConfig]) => {
+            const color = itemConfig.theme?.[theme as keyof typeof itemConfig.theme] || itemConfig.color
+            if (!color) return null
+            
+            // Sanitize color value and key
+            const safeColor = sanitizeCSS(color)
+            const safeKey = sanitizeCSS(key)
+            
+            return safeColor ? `  --color-${safeKey}: ${safeColor};` : null
+          })
+          .filter(Boolean)
+          .join('\n')
+        
+        const safePrefix = sanitizeCSS(prefix)
+        const safeId = sanitizeCSS(id)
+        
+        return `${safePrefix} [data-chart=${safeId}] {\n${rules}\n}`
+      })
+      .join('\n')
+  }
+
   return (
     <style
       dangerouslySetInnerHTML={{
-        __html: Object.entries(THEMES)
-          .map(
-            ([theme, prefix]) => `
-${prefix} [data-chart=${id}] {
-${colorConfig
-  .map(([key, itemConfig]) => {
-    const color =
-      itemConfig.theme?.[theme as keyof typeof itemConfig.theme] ||
-      itemConfig.color
-    return color ? `  --color-${key}: ${color};` : null
-  })
-  .join("\n")}
-}
-`
-          )
-          .join("\n"),
+        __html: generateSafeCSS(),
       }}
     />
   )

@@ -5,6 +5,41 @@ try {
   // ignore error
 }
 
+// Security headers to prevent common vulnerabilities
+const securityHeaders = [
+  {
+    key: 'X-Frame-Options',
+    value: 'DENY', // Prevent clickjacking
+  },
+  {
+    key: 'X-Content-Type-Options', 
+    value: 'nosniff', // Prevent MIME sniffing
+  },
+  {
+    key: 'Referrer-Policy',
+    value: 'origin-when-cross-origin', // Control referrer information
+  },
+  {
+    key: 'X-XSS-Protection',
+    value: '1; mode=block', // Enable XSS filtering
+  },
+  {
+    key: 'Permissions-Policy',
+    value: 'camera=(), microphone=(), geolocation=()', // Restrict dangerous APIs
+  },
+  {
+    key: 'Content-Security-Policy',
+    value: [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Web3 requires unsafe-eval for wallet connections
+      "style-src 'self' 'unsafe-inline'", // Charts require inline styles
+      "img-src 'self' data: blob:", // Allow data URLs for SVG images from contracts
+      "connect-src 'self' https://*.shape.network https://*.walletconnect.org wss://*.walletconnect.org",
+      "frame-src 'none'",
+    ].join('; ')
+  }
+]
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   eslint: {
@@ -21,28 +56,27 @@ const nextConfig = {
     parallelServerBuildTraces: true,
     parallelServerCompiles: true,
   },
+  // Security headers
+  async headers() {
+    return [
+      {
+        // Apply security headers to all routes
+        source: '/(.*)',
+        headers: securityHeaders,
+      },
+    ]
+  },
 }
 
-mergeConfig(nextConfig, userConfig)
-
-function mergeConfig(nextConfig, userConfig) {
-  if (!userConfig) {
-    return
+function mergeConfig(config, userConfig) {
+  if (!userConfig?.default) {
+    return config
   }
-
-  for (const key in userConfig) {
-    if (
-      typeof nextConfig[key] === 'object' &&
-      !Array.isArray(nextConfig[key])
-    ) {
-      nextConfig[key] = {
-        ...nextConfig[key],
-        ...userConfig[key],
-      }
-    } else {
-      nextConfig[key] = userConfig[key]
-    }
+  
+  return {
+    ...config,
+    ...userConfig.default,
   }
 }
 
-export default nextConfig
+export default mergeConfig(nextConfig, userConfig)

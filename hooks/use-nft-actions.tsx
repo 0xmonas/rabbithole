@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { writeContract } from "@wagmi/core"
 import { wagmiConfig, CONTRACT_ADDRESS } from "@/config/wagmi"
+import { logger } from "@/lib/logger"
 
 // ABI for the RabbitHole contract actions
 const rabbitHoleActionsAbi = [
@@ -45,10 +46,11 @@ export function useNFTActions() {
         args: [BigInt(tokenId)],
       })
 
-      console.log(`Growing NFT #${tokenId}, transaction hash: ${hash}`)
+      logger.success(`Growing NFT #${tokenId}`)
+      logger.debug(`Growing NFT #${tokenId}, transaction hash: ${hash}`)
       return true
     } catch (error: any) {
-      console.error("Error growing NFT:", error)
+      logger.error("Error growing NFT", error)
       setActionError(error?.message || "Failed to grow circle. Please try again.")
       return false
     } finally {
@@ -68,10 +70,11 @@ export function useNFTActions() {
         args: [BigInt(tokenId)],
       })
 
-      console.log(`Shrinking NFT #${tokenId}, transaction hash: ${hash}`)
+      logger.success(`Shrinking NFT #${tokenId}`)
+      logger.debug(`Shrinking NFT #${tokenId}, transaction hash: ${hash}`)
       return true
     } catch (error: any) {
-      console.error("Error shrinking NFT:", error)
+      logger.error("Error shrinking NFT", error)
       setActionError(error?.message || "Failed to shrink circle. Please try again.")
       return false
     } finally {
@@ -91,10 +94,11 @@ export function useNFTActions() {
         args: [tokenIds.map((id) => BigInt(id))],
       })
 
-      console.log(`Merging NFTs: ${tokenIds.join(", ")}, transaction hash: ${hash}`)
+      logger.success(`Merging NFTs: ${tokenIds.join(", ")}`)
+      logger.debug(`Merging NFTs: ${tokenIds.join(", ")}, transaction hash: ${hash}`)
       return true
     } catch (error: any) {
-      console.error("Error merging NFTs:", error)
+      logger.error("Error merging NFTs", error)
       setActionError(error?.message || "Failed to merge circles. Please try again.")
       return false
     } finally {

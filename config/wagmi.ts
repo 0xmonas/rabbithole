@@ -3,6 +3,7 @@ import { defineChain } from "viem"
 import { injected, walletConnect } from "@wagmi/connectors"
 import { createAppKit } from '@reown/appkit'
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
+import { logger } from "@/lib/logger"
 
 // Define Shape L2 chain
 export const shapeChain = defineChain({
@@ -70,7 +71,10 @@ export const wagmiConfig = wagmiAdapter.wagmiConfig
 export const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "0xCA38813D69409E4E50F1411A0CAB2570E570C75A") as `0x${string}`
 export const OPENSEA_URL = process.env.NEXT_PUBLIC_OPENSEA_URL || "https://opensea.io/collection/rabbit-hole-shape"
 
-console.log("✅ Reown AppKit initialized")
-console.log("📄 Contract address:", CONTRACT_ADDRESS)
-console.log("🔗 Project ID:", process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID ? "✅ Configured" : "❌ Using fallback")
+// ✅ Success! Reown AppKit initialized
+logger.info("Reown AppKit initialized successfully")
+logger.debug("Contract address:", CONTRACT_ADDRESS)
+logger.debug("Project ID configured", { 
+  hasProjectId: !!process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID 
+})
 
