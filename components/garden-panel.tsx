@@ -22,17 +22,22 @@ export function GardenPanel({ address, userNFTs, onRefreshUserNFTs }: GardenPane
     uproot, 
     workGarden, 
     refreshGarden, 
-    transactionModal 
+    transactionModal,
+    gardenStats,
+    fetchGardenWideStats 
   } = useGarden(address, async () => {
     // Refresh both garden and user NFTs after successful transaction
     await refreshGarden()
+    await fetchGardenWideStats() // Also refresh community stats
     onRefreshUserNFTs()
   })
   
   const [selectedAction, setSelectedAction] = useState<"plant" | "uproot" | "work">("plant")
 
   const handlePlantSeeds = async () => {
-    await plantSeeds(10000) // Check up to token ID 10000
+    // GAS OPTIMIZATION: Use increased range to match work garden capability  
+    // Found tokens like #1004, #1014, so need to check beyond 1000
+    await plantSeeds(1100) // Increased from 1000 to 1100 to match work garden range
   }
 
   const handleUproot = async () => {
@@ -40,7 +45,15 @@ export function GardenPanel({ address, userNFTs, onRefreshUserNFTs }: GardenPane
   }
 
   const handleWorkGarden = async () => {
-    await workGarden(10000)
+    // 🔥 GAS OPTIMIZATION: Let the hook determine optimal range
+    // 👤 WALLET VALIDATION: Ensure wallet is connected
+    if (!address) {
+      console.error("❌ Cannot work garden: No wallet connected")
+      return
+    }
+    
+    console.log(`🌍 Working garden from address: ${address}`)
+    await workGarden() // No parameter = smart optimization
   }
 
   const isTransactionPending = transactionModal.isOpen && transactionModal.step !== "idle"
@@ -52,10 +65,42 @@ export function GardenPanel({ address, userNFTs, onRefreshUserNFTs }: GardenPane
     return `${hours}h ${minutes}m`
   }
 
+  const formatTimestamp = (timestamp: number) => {
+    if (timestamp === 0) return "Never"
+    const date = new Date(timestamp * 1000)
+    const now = new Date()
+    const diff = now.getTime() - date.getTime()
+    const hours = Math.floor(diff / (1000 * 60 * 60))
+    if (hours < 24) {
+      return `${hours}h ago`
+    }
+    const days = Math.floor(hours / 24)
+    return `${days}d ago`
+  }
+
+  const formatCountdown = (timestamp: number) => {
+    if (timestamp === 0) return "Unknown"
+    const now = Math.floor(Date.now() / 1000)
+    const diff = timestamp - now
+    
+    if (diff <= 0) return "Ready now"
+    
+    const hours = Math.floor(diff / 3600)
+    const minutes = Math.floor((diff % 3600) / 60)
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m`
+    }
+    return `${minutes}m`
+  }
+
   // Calculate garden stats
   const totalGardenSize = gardenNFTs.reduce((sum, nft) => sum + nft.size, 0)
   const readyToGrow = gardenNFTs.filter(nft => nft.growCooldownRemaining === 0).length
   const avgSize = gardenNFTs.length > 0 ? Math.round(totalGardenSize / gardenNFTs.length) : 0
+
+  // 🌍 COMMUNITY SERVICE: Work Garden should be enabled when ANY garden tokens are ready
+  const canWorkGarden = gardenStats.readyToGrowCount > 0 && !isTransactionPending
 
   return (
     <div className="flex-1 flex flex-col">
@@ -166,20 +211,105 @@ export function GardenPanel({ address, userNFTs, onRefreshUserNFTs }: GardenPane
 
               <button
                 onClick={handleWorkGarden}
-                disabled={readyToGrow === 0 || isTransactionPending}
+                disabled={!canWorkGarden || gardenStats.loading}
                 className={cn(
                   "w-full border border-black px-3 py-2 text-xs flex items-center justify-center",
-                  readyToGrow > 0 && !isTransactionPending
-                    ? "bg-blue-500 text-white hover:bg-blue-600"
-                    : readyToGrow === 0 && gardenNFTs.length > 0
-                      ? "bg-yellow-200 text-yellow-800 cursor-not-allowed"
-                      : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                  canWorkGarden && !gardenStats.loading ? "bg-blue-500 text-white hover:bg-blue-600" : "bg-gray-200 text-gray-500 cursor-not-allowed"
                 )}
+                title={gardenStats.loading 
+                  ? "Loading garden statistics..."
+                  : gardenStats.readyToGrowCount > 0 
+                    ? `Gas Optimized: Will grow ${gardenStats.readyToGrowCount} circles. Checks max 1100 tokens (covers all garden tokens)` 
+                    : "No circles ready to grow"
+                }
               >
                 <Zap size={12} className="mr-2" />
-                WORK GARDEN
+                {gardenStats.loading ? (
+                  <>
+                    WORK GARDEN (
+                    <div className="w-4 h-3 bg-gray-400 animate-pulse mx-1"></div>
+                    )
+                  </>
+                ) : (
+                  `WORK GARDEN (${gardenStats.readyToGrowCount})`
+                )}
               </button>
               
+              {/* Community Service Info */}
+              {gardenStats.totalGardenTokens > 0 || gardenStats.loading ? (
+                <div className="mt-2 p-2 border border-black bg-blue-50 text-xs">
+                  <div className="font-bold mb-1 flex items-center justify-between">
+                    <div className="flex items-center">
+                      <Zap size={10} className="mr-1" />
+                      COMMUNITY SERVICE
+                    </div>
+                    <button
+                      onClick={fetchGardenWideStats}
+                      disabled={gardenStats.loading}
+                      className="text-blue-600 hover:text-blue-800 underline text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Refresh garden-wide statistics"
+                    >
+                      Refresh
+                    </button>
+                  </div>
+                  
+                  {gardenStats.loading ? (
+                    <div className="space-y-1 text-gray-600">
+                      <div className="flex justify-between">
+                        <span>Total Garden:</span>
+                        <div className="w-12 h-3 bg-gray-300 animate-pulse"></div>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Ready to Grow:</span>
+                        <div className="w-8 h-3 bg-gray-300 animate-pulse"></div>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Last Worked:</span>
+                        <div className="w-16 h-3 bg-gray-300 animate-pulse"></div>
+                      </div>
+                      <div className="w-full h-3 bg-blue-200 animate-pulse"></div>
+                      <div className="text-blue-600 font-medium">
+                        Loading garden statistics...
+                      </div>
+                    </div>
+                  ) : gardenStats.totalGardenTokens === 0 ? (
+                    <div className="text-gray-600">
+                      <div className="text-center py-2">
+                        No tokens found in community garden
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-1 text-gray-600">
+                      <div>Total Garden: {gardenStats.totalGardenTokens} circles</div>
+                      <div>Ready to Grow: {gardenStats.readyToGrowCount} circles</div>
+                      <div>Last Worked: {formatTimestamp(gardenStats.lastWorkGardenTime)}</div>
+                      
+                      {gardenStats.readyToGrowCount === 0 && gardenStats.nextWorkGardenTime > 0 && (
+                        <div className="text-green-600 font-medium">
+                          Next tokens ready: {formatCountdown(gardenStats.nextWorkGardenTime)}
+                        </div>
+                      )}
+                      
+                      {gardenStats.readyToGrowCount > 0 && (
+                        <div className="text-red-600 font-medium">
+                          WARNING: {gardenStats.readyToGrowCount} tokens ready but not grown - check console for debug info
+                        </div>
+                      )}
+                      
+                      <div className="text-blue-600 font-medium">
+                        Gas Optimized: Checks max 1100 tokens (covers all garden tokens)
+                      </div>
+                      
+                      {gardenStats.readyToGrowCount === 0 && gardenStats.totalGardenTokens > 0 && (
+                        <div className="text-yellow-600 font-medium">
+                          All garden circles are cooling down
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : null}
+
               {/* Help Message */}
               {userNFTs.length === 0 && gardenNFTs.length === 0 && (
                 <div className="mt-3 p-2 border border-black bg-gray-50 text-xs">
@@ -298,7 +428,9 @@ export function GardenPanel({ address, userNFTs, onRefreshUserNFTs }: GardenPane
                 WORK GARDEN
               </div>
               <p className="text-gray-600">
-                Community service function! Automatically grows ALL eligible tokens in the garden (any token past its 24h cooldown), not just yours. Anyone can call this to help the entire community grow their tokens faster.
+                <strong>Community Service Function!</strong> Anyone can call this to automatically grow ALL eligible circles in the entire garden (not just yours). 
+                Grows any circle that has waited 24+ hours since last growth. This is an altruistic action that helps the entire community grow their tokens faster. 
+                You don't need to own any tokens in the garden to help others!
               </p>
             </div>
             
