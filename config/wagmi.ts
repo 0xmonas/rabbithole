@@ -69,7 +69,6 @@ export const wagmiConfig = wagmiAdapter.wagmiConfig
 
 // Contract details
 export const CONTRACT_ADDRESS = (process.env.NEXT_PUBLIC_CONTRACT_ADDRESS || "0xCA38813D69409E4E50F1411A0CAB2570E570C75A") as `0x${string}`
-export const OPENSEA_URL = process.env.NEXT_PUBLIC_OPENSEA_URL || "https://opensea.io/collection/rabbit-hole-shape"
 
 // ✅ Success! Reown AppKit initialized
 logger.info("Reown AppKit initialized successfully")

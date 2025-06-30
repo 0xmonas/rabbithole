@@ -13,12 +13,13 @@ import { useAccount, useChainId } from "wagmi"
 import { useNFTs } from "@/hooks/use-nfts"
 import { shapeChain } from "@/config/wagmi"
 import { Providers } from "./providers"
+import { ExternalLink } from "lucide-react"
 
 // Main app component that uses wagmi hooks
 function RabbitHoleAppInner() {
   const { address, isConnected } = useAccount()
   const chainId = useChainId()
-  const { nfts, loading, refreshNFTs } = useNFTs(address || null)
+  const { nfts, isLoading, error, refreshNFTs } = useNFTs(address || null)
   const [selectedNFT, setSelectedNFT] = useState<number | null>(null)
   const [activeSection, setActiveSection] = useState("GALLERY")
   const [mergeMode, setMergeMode] = useState(false)
@@ -163,7 +164,7 @@ function RabbitHoleAppInner() {
               SWITCH NETWORK
             </button>
           </div>
-        ) : loading ? (
+        ) : isLoading ? (
           <div className="flex flex-col items-center justify-center h-[70vh] border border-black p-8">
             <div className="animate-pulse flex space-x-4">
               <div className="rounded-full bg-gray-200 h-12 w-12"></div>
@@ -211,7 +212,7 @@ function RabbitHoleAppInner() {
                   <div className="flex-1 overflow-y-auto">
                     <NFTGallery
                       nfts={nfts}
-                      loading={loading}
+                      loading={isLoading}
                       selectedNFT={selectedNFT}
                       onSelectNFT={setSelectedNFT}
                       mergeMode={mergeMode}
@@ -281,72 +282,132 @@ function RabbitHoleAppInner() {
                           <div className="mb-6">
                             <p className="font-bold mb-2">COLLECT!</p>
                             <p className="mb-4">
-                              EXPLORE SECONDARY MARKETS TO GET YOUR RABBIT HOLE.
-                              <br />
-                              HIGHLIGHT OR ANY OTHER @SHAPE_L2 MARKETPLACE.
-                              <br />
-                              FOR BRIDGING — VISIT SHAPE.NETWORK FOR RELEVANT LINKS.
+                              Explore secondary markets to get your Rabbit Hole NFTs:
+                            </p>
+                            <div className="ml-4 mb-4">
+                              <div className="mb-2">
+                                <a 
+                                  href="https://opensea.io/collection/rabbit-hole-shape" 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center text-blue-600 hover:text-blue-800 underline"
+                                >
+                                  OpenSea Marketplace <ExternalLink size={12} className="ml-1" />
+                                </a>
+                              </div>
+                              <div className="mb-2">
+                                <a 
+                                  href="https://highlight.xyz" 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center text-blue-600 hover:text-blue-800 underline"
+                                >
+                                  Highlight.xyz <ExternalLink size={12} className="ml-1" />
+                                </a>
+                              </div>
+                              <div className="mb-2">
+                                <span>Or any other </span>
+                                <a 
+                                  href="https://twitter.com/SHAPE_L2" 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center text-blue-600 hover:text-blue-800 underline"
+                                >
+                                  @SHAPE_L2 <ExternalLink size={12} className="ml-1" />
+                                </a>
+                                <span> marketplace</span>
+                              </div>
+                            </div>
+                            <p className="mb-4">
+                              For bridging assets to Shape L2, we recommend:{" "}
+                              <a 
+                                href="https://relay.link/bridge" 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center text-blue-600 hover:text-blue-800 underline"
+                              >
+                                Relay Bridge <ExternalLink size={12} className="ml-1" />
+                              </a>
+                              {" "}or visit{" "}
+                              <a 
+                                href="https://shape.network" 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center text-blue-600 hover:text-blue-800 underline"
+                              >
+                                Shape.network <ExternalLink size={12} className="ml-1" />
+                              </a>
+                              {" "}for more options.
                             </p>
                           </div>
 
                           <div className="mb-6">
                             <p className="font-bold mb-2">GROW & SHRINK</p>
                             <p className="mb-4">
-                              EACH TOKEN CAN GROW OR SHRINK ONCE PER DAY:
+                              Each token can grow or shrink once per day:
                               <br />
-                              ⚫️5 → ⚫️6 OR ⚫️6 → ⚫️5
+                              ⚫️5 → ⚫️6 or ⚫️6 → ⚫️5
                               <br />
-                              (MIN SIZE: 1, MAX SIZE: 1000)
+                              (Min size: 1, Max size: 1000)
                             </p>
-                            <p className="mb-4">USAGE: CALL THE GROW(TOKENID) OR SHRINK(TOKENID) FUNCTIONS.</p>
+                            <p className="mb-4">
+                              Usage: Use the Grow/Shrink buttons in the Gallery or call the contract functions directly.
+                            </p>
                           </div>
 
                           <div className="mb-6">
                             <p className="font-bold mb-2">MERGE</p>
                             <p className="mb-4">
-                              SMALLER TOKENS MERGE INTO LARGER ONES AND ARE BURNED IN THE PROCESS:
+                              Smaller tokens merge into larger ones and are burned in the process:
                               <br />
                               ⚫️3 + ⚫️2 = ⚫️5 (⚪️🔥 ⚪️🔥)
                             </p>
                             <p className="mb-4">
-                              IF THE COMBINED SIZE EXCEEDS 1000, A NEW TOKEN WILL BE CREATED FOR THE OVERFLOW:
+                              If the combined size exceeds 1000, a new token will be created for the overflow:
                               <br />
-                              ⚫️800 + ⚫️400 = ⚫️1000 AND ⚫️200
+                              ⚫️800 + ⚫️400 = ⚫️1000 and ⚫️200
                             </p>
                             <p className="mb-4">
-                              USAGE: USE THE MERGETOKENS([TOKENID1, TOKENID2, ...]) FUNCTION. TO ADD MORE IDS, CLICK THE
-                              + BUTTON.
-                            </p>
-                          </div>
-
-                          <div className="mb-6">
-                            <p className="font-bold mb-2">1/1 FLEX</p>
-                            <p className="mb-4">
-                              WHEN A TOKEN REACHES SIZE 1000, IT BECOMES A 1/1, UNLOCKING THE ABILITY TO ADD UNIQUE
-                              METADATA:
-                              <br />
-                              ⚫️1000 = 🎨 ("YOU'VE HIT MAX CAPACITY—TIME TO MAKE IT TRULY ONE OF A KIND!")
+                              Usage: Go to the Merge [S0.3] tab, select multiple tokens, and click the merge button.
                             </p>
                           </div>
 
                           <div className="mb-6">
-                            <p className="font-bold mb-2">TRACK YOUR TOKENS</p>
+                            <p className="font-bold mb-2">GARDEN</p>
                             <p className="mb-4">
-                              NO WALLET CONNECTION NEEDED!
+                              Plant your tokens in the community garden for automated growing:
                               <br />
-                              JUST PASTE YOUR ADDRESS AND TRACK YOUR TOKEN'S PROGRESS:
+                              🌱 Plant → 🌿 Community grows → 🌳 Harvest
+                            </p>
+                            <p className="mb-4">
+                              Usage: Go to the Garden [S0.4] tab to plant, work, and uproot your tokens.
+                            </p>
+                          </div>
+
+                          <div className="mb-6">
+                            <p className="font-bold mb-2">1/1 ACHIEVEMENT</p>
+                            <p className="mb-4">
+                              When a token reaches size 1000, it becomes a 1/1, unlocking the ability to add unique metadata:
                               <br />
-                              RHCHECKER.VERCEL.APP
+                              ⚫️1000 = 🎨 ("You've hit max capacity—time to make it truly one of a kind!")
                             </p>
                           </div>
 
                           <div>
                             <p className="font-bold mb-2">STAY SAFE</p>
-                            <p>
-                              ALWAYS MAKE SURE YOU'RE CONNECTED TO THE CORRECT CONTRACT:
-                              <br />
-                              0XCA38813D69409E4E50F1411A0CAB2570E570C75A →
+                            <p className="mb-2">
+                              Always make sure you're connected to the correct contract:
                             </p>
+                            <div className="ml-4">
+                              <a 
+                                href="https://explorer.shape.network/address/0xCA38813D69409E4E50F1411A0CAB2570E570C75A" 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center text-blue-600 hover:text-blue-800 underline font-mono text-xs"
+                              >
+                                0xCA38813D69409E4E50F1411A0CAB2570E570C75A <ExternalLink size={12} className="ml-1" />
+                              </a>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -358,11 +419,56 @@ function RabbitHoleAppInner() {
                         <div className="p-4 space-y-3">
                           <div>
                             <p className="font-bold mb-1">ORIGINAL PROJECT</p>
-                            <p>Created by @0xmonas</p>
+                            <p>
+                              Created by{" "}
+                              <a 
+                                href="https://twitter.com/0xmonas" 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center text-blue-600 hover:text-blue-800 underline"
+                              >
+                                @0xmonas <ExternalLink size={12} className="ml-1" />
+                              </a>
+                            </p>
                           </div>
                           <div>
                             <p className="font-bold mb-1">GARDEN CONTRACT</p>
-                            <p>Special thanks to @takenstheorem for creating the Garden contract and their invaluable contributions to the Rabbit Hole community.</p>
+                            <p>
+                              Special thanks to{" "}
+                              <a 
+                                href="https://twitter.com/takenstheorem" 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center text-blue-600 hover:text-blue-800 underline"
+                              >
+                                @takenstheorem <ExternalLink size={12} className="ml-1" />
+                              </a>
+                              {" "}for creating the Garden contract and their invaluable contributions to the Rabbit Hole community.
+                            </p>
+                          </div>
+                          <div>
+                            <p className="font-bold mb-1">SHAPE L2 ECOSYSTEM</p>
+                            <p>
+                              Built on{" "}
+                              <a 
+                                href="https://shape.network" 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center text-blue-600 hover:text-blue-800 underline"
+                              >
+                                Shape Network <ExternalLink size={12} className="ml-1" />
+                              </a>
+                              {" "}— Follow{" "}
+                              <a 
+                                href="https://twitter.com/SHAPE_L2" 
+                                target="_blank" 
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center text-blue-600 hover:text-blue-800 underline"
+                              >
+                                @SHAPE_L2 <ExternalLink size={12} className="ml-1" />
+                              </a>
+                              {" "}for updates
+                            </p>
                           </div>
                         </div>
                       </div>

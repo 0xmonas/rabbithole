@@ -22,8 +22,8 @@ export function NetworkSwitchModal({ isOpen, onClose, currentChainId }: NetworkS
       if (e.key === "Escape") onClose()
     }
     if (isOpen) {
-      window.addEventListener("keydown", handleEsc)
-      return () => window.removeEventListener("keydown", handleEsc)
+    window.addEventListener("keydown", handleEsc)
+    return () => window.removeEventListener("keydown", handleEsc)
     }
   }, [onClose, isOpen])
 
@@ -34,8 +34,8 @@ export function NetworkSwitchModal({ isOpen, onClose, currentChainId }: NetworkS
       if (target.id === "modal-backdrop") onClose()
     }
     if (isOpen) {
-      window.addEventListener("mousedown", handleClickOutside)
-      return () => window.removeEventListener("mousedown", handleClickOutside)
+    window.addEventListener("mousedown", handleClickOutside)
+    return () => window.removeEventListener("mousedown", handleClickOutside)
     }
   }, [onClose, isOpen])
 
@@ -93,9 +93,9 @@ export function NetworkSwitchModal({ isOpen, onClose, currentChainId }: NetworkS
             setError("Unable to add network. Please add Shape network manually in your wallet.")
           }
         } catch (addError: any) {
-          console.error("Error adding network:", addError)
+            console.error("Error adding network:", addError)
           setError(`Failed to add Shape network: ${addError.message || 'Please add the network manually in your wallet.'}`)
-        }
+          }
       } else if (switchError.code === 4001) {
         // User rejected request
         setError("Network switch was rejected. Please try again and approve the request.")

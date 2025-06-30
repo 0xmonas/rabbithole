@@ -14,19 +14,19 @@ export function useNetwork() {
     
     if (account.status !== "connected") {
       console.log("Account not connected, clearing network state")
-      setChainId(undefined)
-      setIsCorrectNetwork(false)
-      setIsLoading(false)
-      return
-    }
+          setChainId(undefined)
+          setIsCorrectNetwork(false)
+          setIsLoading(false)
+          return
+        }
 
     const currentChainId = account.chainId
     console.log("Network update - Chain ID:", currentChainId)
     
     setChainId(currentChainId)
     setIsCorrectNetwork(currentChainId === shapeChain.id)
-    setIsLoading(false)
-  }
+        setIsLoading(false)
+      }
 
   useEffect(() => {
     // Get initial state
