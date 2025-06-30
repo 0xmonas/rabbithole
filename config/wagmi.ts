@@ -35,32 +35,32 @@ export const shapeChain = defineChain({
   },
 })
 
-// 1. Create Wagmi Adapter
+// 1. Create Wagmi Adapter with dummy project ID to avoid API calls
 const wagmiAdapter = new WagmiAdapter({
   ssr: false, // CRITICAL: Disable SSR to prevent extension conflicts
   networks: [shapeChain],
-  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'fallback-project-id',
+  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'dummy-project-id-no-api', // Safe dummy ID
   transports: {
     [shapeChain.id]: http(process.env.NEXT_PUBLIC_RPC_URL || "https://mainnet.shape.network"),
   },
 })
 
-// 2. Create Reown AppKit - This handles all wallet connections!
+// 2. Create Reown AppKit with minimal features to reduce API calls
 export const appKit = createAppKit({
   adapters: [wagmiAdapter],
   networks: [shapeChain],
-  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'fallback-project-id',
+  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'dummy-project-id-no-api', // Safe dummy ID
   metadata: {
     name: 'Rabbit Hole',
     description: 'An onchain experiment by Monas',
     url: typeof window !== 'undefined' ? window.location.origin : 'https://rabbithole.app',
-    icons: ['https://rabbithole.app/icon.png']
+    icons: ['/rabbithole.png'] // Fixed icon path
   },
   features: {
-    analytics: false, // Optional analytics
-    email: false, // Email login
-    socials: [], // Social logins
-    emailShowWallets: true, // Show wallets in email flow
+    analytics: false, // Disable analytics completely
+    email: false, // Disable email login
+    socials: [], // Disable social logins
+    emailShowWallets: false, // Disable email features
   }
 })
 

@@ -34,31 +34,43 @@ function RabbitHoleAppInner() {
   // Check if we need to show the network switch modal
   useEffect(() => {
     if (isConnected && !isNetworkLoading && !isCorrectNetwork) {
-      console.log(
-        "Showing network modal. Connected:",
-        isConnected,
-        "Network loading:",
-        isNetworkLoading,
-        "Correct network:",
-        isCorrectNetwork,
-        "Chain ID:",
-        chainId,
-      )
       setShowNetworkModal(true)
     } else {
       setShowNetworkModal(false)
     }
   }, [isConnected, isNetworkLoading, isCorrectNetwork, chainId])
 
-  // Debug network status
+  // Clear console warnings about browser extensions (they're harmless)
   useEffect(() => {
-    console.log("Network status:", {
-      isConnected,
-      chainId,
-      isCorrectNetwork,
-      isNetworkLoading,
-    })
-  }, [isConnected, chainId, isCorrectNetwork, isNetworkLoading])
+    // Hide common wallet extension warnings in console
+    const originalError = console.error
+    const originalWarn = console.warn
+    
+    console.error = (...args) => {
+      const message = args[0]?.toString() || ''
+      if (
+        message.includes('Cannot redefine property: ethereum') ||
+        message.includes('chrome.runtime.sendMessage') ||
+        message.includes('Extension ID')
+      ) {
+        return // Suppress wallet extension conflicts
+      }
+      originalError(...args)
+    }
+    
+    console.warn = (...args) => {
+      const message = args[0]?.toString() || ''
+      if (message.includes('Reown Config')) {
+        return // Suppress Web3Modal config warnings
+      }
+      originalWarn(...args)
+    }
+
+    return () => {
+      console.error = originalError
+      console.warn = originalWarn
+    }
+  }, [])
 
   // Sections for the main navigation
   const sections = [
