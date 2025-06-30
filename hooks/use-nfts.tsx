@@ -336,10 +336,10 @@ export function useNFTs(address: string | null) {
       // Quick balance check for validation
       const balance = await withTimeout(
         readContract(wagmiConfig, {
-          address: CONTRACT_ADDRESS,
-          abi: rabbitHoleAbi,
+        address: CONTRACT_ADDRESS,
+        abi: rabbitHoleAbi,
           functionName: "balanceOf",
-          args: [address as `0x${string}`],
+        args: [address as `0x${string}`],
         }),
         5000
       )
@@ -376,7 +376,7 @@ export function useNFTs(address: string | null) {
       // Get tokens that were transferred OUT of this address  
       const transferOutLogs = await withTimeout(
         publicClient!.getLogs({
-          address: CONTRACT_ADDRESS,
+            address: CONTRACT_ADDRESS,
           event: parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)'),
           args: {
             from: address as `0x${string}`, // Tokens transferred FROM this address
@@ -393,12 +393,20 @@ export function useNFTs(address: string | null) {
       const tokensReceived = new Set((transferLogs as any[]).map((log: any) => Number(log.args.tokenId)))
       const tokensSent = new Set((transferOutLogs as any[]).map((log: any) => Number(log.args.tokenId)))
       
-      // Current owned = received - sent
-      const ownedTokenIds = Array.from(tokensReceived).filter(tokenId => !tokensSent.has(tokenId))
+      // ✅ FIXED: Garden transfers need special handling
+      // Don't count garden transfers as "sent away" - they're temporary deposits
+      const nonGardenTransferOutLogs = (transferOutLogs as any[]).filter((log: any) => 
+        log.args.to.toLowerCase() !== GARDEN_CONTRACT_ADDRESS.toLowerCase()
+      )
+      const actualTokensSent = new Set(nonGardenTransferOutLogs.map((log: any) => Number(log.args.tokenId)))
+      
+      // Current owned = received - actually sent (excluding garden deposits)
+      const ownedTokenIds = Array.from(tokensReceived).filter(tokenId => !actualTokensSent.has(tokenId))
       
       logger.debug(`Currently owns ${ownedTokenIds.length} tokens`, { 
         received: Array.from(tokensReceived), 
-        sent: Array.from(tokensSent),
+        sentToGarden: Array.from(tokensSent).filter(id => !actualTokensSent.has(id)),
+        actuallySent: Array.from(actualTokensSent),
         owned: ownedTokenIds 
       })
 

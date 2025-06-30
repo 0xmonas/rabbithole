@@ -4,6 +4,7 @@ import { useState } from "react"
 import type { NFT } from "@/types/nft"
 import { cn } from "@/lib/utils"
 import { useGarden } from "@/hooks/use-garden"
+import { TransactionModal } from "@/components/transaction-modal"
 import { TokenImage } from "@/components/token-image"
 import { Sprout, ArrowUpFromLine, ArrowDownToLine, Zap, Clock, Leaf } from "lucide-react"
 
@@ -21,34 +22,28 @@ export function GardenPanel({ address, userNFTs, onRefreshUserNFTs }: GardenPane
     uproot, 
     workGarden, 
     refreshGarden, 
-    isActionPending, 
-    actionError 
-  } = useGarden(address)
+    transactionModal 
+  } = useGarden(address, async () => {
+    // Refresh both garden and user NFTs after successful transaction
+    await refreshGarden()
+    onRefreshUserNFTs()
+  })
   
   const [selectedAction, setSelectedAction] = useState<"plant" | "uproot" | "work">("plant")
 
   const handlePlantSeeds = async () => {
-    const success = await plantSeeds(10000) // Check up to token ID 10000
-    if (success) {
-      await refreshGarden()
-      onRefreshUserNFTs() // Refresh user NFTs since they'll be transferred
-    }
+    await plantSeeds(10000) // Check up to token ID 10000
   }
 
   const handleUproot = async () => {
-    const success = await uproot()
-    if (success) {
-      await refreshGarden()
-      onRefreshUserNFTs() // Refresh user NFTs since they'll be transferred back
-    }
+    await uproot()
   }
 
   const handleWorkGarden = async () => {
-    const success = await workGarden(10000)
-    if (success) {
-      await refreshGarden()
-    }
+    await workGarden(10000)
   }
+
+  const isTransactionPending = transactionModal.isOpen && transactionModal.step !== "idle"
 
   const formatCooldown = (seconds: number) => {
     if (seconds === 0) return "Ready"
@@ -143,10 +138,10 @@ export function GardenPanel({ address, userNFTs, onRefreshUserNFTs }: GardenPane
             <div className="p-3 space-y-2">
               <button
                 onClick={handlePlantSeeds}
-                disabled={userNFTs.length === 0 || isActionPending}
+                disabled={userNFTs.length === 0 || isTransactionPending}
                 className={cn(
                   "w-full border border-black px-3 py-2 text-xs flex items-center justify-center",
-                  userNFTs.length > 0 && !isActionPending
+                  userNFTs.length > 0 && !isTransactionPending
                     ? "bg-green-500 text-white hover:bg-green-600"
                     : "bg-gray-200 text-gray-500 cursor-not-allowed"
                 )}
@@ -157,10 +152,10 @@ export function GardenPanel({ address, userNFTs, onRefreshUserNFTs }: GardenPane
 
               <button
                 onClick={handleUproot}
-                disabled={gardenNFTs.length === 0 || isActionPending}
+                disabled={gardenNFTs.length === 0 || isTransactionPending}
                 className={cn(
                   "w-full border border-black px-3 py-2 text-xs flex items-center justify-center",
-                  gardenNFTs.length > 0 && !isActionPending
+                  gardenNFTs.length > 0 && !isTransactionPending
                     ? "bg-orange-500 text-white hover:bg-orange-600"
                     : "bg-gray-200 text-gray-500 cursor-not-allowed"
                 )}
@@ -171,10 +166,10 @@ export function GardenPanel({ address, userNFTs, onRefreshUserNFTs }: GardenPane
 
               <button
                 onClick={handleWorkGarden}
-                disabled={readyToGrow === 0 || isActionPending}
+                disabled={readyToGrow === 0 || isTransactionPending}
                 className={cn(
                   "w-full border border-black px-3 py-2 text-xs flex items-center justify-center",
-                  readyToGrow > 0 && !isActionPending
+                  readyToGrow > 0 && !isTransactionPending
                     ? "bg-blue-500 text-white hover:bg-blue-600"
                     : readyToGrow === 0 && gardenNFTs.length > 0
                       ? "bg-yellow-200 text-yellow-800 cursor-not-allowed"
@@ -198,12 +193,7 @@ export function GardenPanel({ address, userNFTs, onRefreshUserNFTs }: GardenPane
           </div>
         </div>
 
-        {/* Action Error */}
-        {actionError && (
-          <div className="mb-6 p-3 border border-red-500 bg-red-50 text-red-600 text-xs">
-            {actionError}
-          </div>
-        )}
+        {/* Transaction Modal handles error display */}
 
         {/* Garden NFTs Display */}
         <div className="border border-black">
@@ -324,6 +314,16 @@ export function GardenPanel({ address, userNFTs, onRefreshUserNFTs }: GardenPane
           </div>
         </div>
       </div>
+      
+      {/* Transaction Modal */}
+      <TransactionModal
+        isOpen={transactionModal.isOpen}
+        onClose={transactionModal.closeModal}
+        step={transactionModal.step}
+        txHash={transactionModal.txHash}
+        error={transactionModal.error}
+        operation={transactionModal.operation}
+      />
     </div>
   )
 } 

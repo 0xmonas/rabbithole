@@ -4,6 +4,7 @@ import { useState, useEffect } from "react"
 import type { NFT } from "@/types/nft"
 import { cn } from "@/lib/utils"
 import { useNFTActions } from "@/hooks/use-nft-actions"
+import { TransactionModal } from "@/components/transaction-modal"
 
 interface MergePanelProps {
   nfts: NFT[]
@@ -21,7 +22,10 @@ export function MergePanel({
   selectedNFTsForMerge 
 }: MergePanelProps) {
   const [mergePreview, setMergePreview] = useState<{ size: number; remainder: number }>({ size: 0, remainder: 0 })
-  const { mergeNFTs, isActionPending, actionError } = useNFTActions()
+  const { mergeNFTs, transactionModal } = useNFTActions(async () => {
+    // Refresh NFTs after successful merge
+    onMergeComplete()
+  })
 
   // Calculate the merge preview whenever selected NFTs change
   useEffect(() => {
@@ -49,10 +53,10 @@ export function MergePanel({
 
   const handleMerge = async () => {
     if (selectedNFTsForMerge.length < 2) return
-
     await mergeNFTs(selectedNFTsForMerge)
-    onMergeComplete()
   }
+
+  const isTransactionPending = transactionModal.isOpen && transactionModal.step !== "idle"
 
   return (
     <div className="flex-1 flex flex-col">
@@ -155,21 +159,17 @@ export function MergePanel({
                 <div className="mt-6">
                   <button
                     onClick={handleMerge}
-                    disabled={selectedNFTsForMerge.length < 2 || isActionPending}
+                    disabled={selectedNFTsForMerge.length < 2 || isTransactionPending}
                     className={cn(
                       "w-full border border-black px-4 py-2",
-                      selectedNFTsForMerge.length >= 2 && !isActionPending
+                      selectedNFTsForMerge.length >= 2 && !isTransactionPending
                         ? "bg-black text-white hover:bg-gray-800"
                         : "bg-gray-200 text-gray-500 cursor-not-allowed",
                     )}
                   >
-                    {isActionPending ? "MERGING..." : "MERGE SELECTED CIRCLES"}
+                    {isTransactionPending ? "MERGING..." : "MERGE SELECTED CIRCLES"}
                   </button>
                 </div>
-
-                {actionError && (
-                  <div className="mt-4 p-2 border border-red-500 bg-red-50 text-red-600">{actionError}</div>
-                )}
               </div>
             </div>
 
@@ -252,6 +252,16 @@ export function MergePanel({
           </div>
         )}
       </div>
+      
+      {/* Transaction Modal */}
+      <TransactionModal
+        isOpen={transactionModal.isOpen}
+        onClose={transactionModal.closeModal}
+        step={transactionModal.step}
+        txHash={transactionModal.txHash}
+        error={transactionModal.error}
+        operation={transactionModal.operation}
+      />
     </div>
   )
 }

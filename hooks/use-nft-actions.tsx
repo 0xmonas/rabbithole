@@ -1,8 +1,8 @@
 "use client"
 
-import { useState } from "react"
 import { writeContract } from "@wagmi/core"
 import { wagmiConfig, CONTRACT_ADDRESS } from "@/config/wagmi"
+import { useTransactionModal } from "./use-transaction-modal"
 import { logger } from "@/lib/logger"
 
 // ABI for the RabbitHole contract actions
@@ -30,88 +30,65 @@ const rabbitHoleActionsAbi = [
   },
 ] as const
 
-export function useNFTActions() {
-  const [isActionPending, setIsActionPending] = useState(false)
-  const [actionError, setActionError] = useState<string | null>(null)
+export function useNFTActions(onSuccess?: () => void | Promise<void>) {
+  const transactionModal = useTransactionModal()
 
   const growNFT = async (tokenId: number) => {
-    setIsActionPending(true)
-    setActionError(null)
-
-    try {
-      const hash = await writeContract(wagmiConfig, {
-        address: CONTRACT_ADDRESS,
-        abi: rabbitHoleActionsAbi,
-        functionName: "grow",
-        args: [BigInt(tokenId)],
-      })
-
-      logger.success(`Growing NFT #${tokenId}`)
-      logger.debug(`Growing NFT #${tokenId}, transaction hash: ${hash}`)
-      return true
-    } catch (error: any) {
-      logger.error("Error growing NFT", error)
-      setActionError(error?.message || "Failed to grow circle. Please try again.")
-      return false
-    } finally {
-      setIsActionPending(false)
-    }
+    return await transactionModal.executeTransaction(
+      `Growing Circle #${tokenId}`,
+      async () => {
+        const hash = await writeContract(wagmiConfig, {
+          address: CONTRACT_ADDRESS,
+          abi: rabbitHoleActionsAbi,
+          functionName: "grow",
+          args: [BigInt(tokenId)],
+        })
+        logger.success(`Growing NFT #${tokenId}`)
+        return hash
+      },
+      onSuccess
+    )
   }
 
   const shrinkNFT = async (tokenId: number) => {
-    setIsActionPending(true)
-    setActionError(null)
-
-    try {
-      const hash = await writeContract(wagmiConfig, {
-        address: CONTRACT_ADDRESS,
-        abi: rabbitHoleActionsAbi,
-        functionName: "shrink",
-        args: [BigInt(tokenId)],
-      })
-
-      logger.success(`Shrinking NFT #${tokenId}`)
-      logger.debug(`Shrinking NFT #${tokenId}, transaction hash: ${hash}`)
-      return true
-    } catch (error: any) {
-      logger.error("Error shrinking NFT", error)
-      setActionError(error?.message || "Failed to shrink circle. Please try again.")
-      return false
-    } finally {
-      setIsActionPending(false)
-    }
+    return await transactionModal.executeTransaction(
+      `Shrinking Circle #${tokenId}`,
+      async () => {
+        const hash = await writeContract(wagmiConfig, {
+          address: CONTRACT_ADDRESS,
+          abi: rabbitHoleActionsAbi,
+          functionName: "shrink",
+          args: [BigInt(tokenId)],
+        })
+        logger.success(`Shrinking NFT #${tokenId}`)
+        return hash
+      },
+      onSuccess
+    )
   }
 
   const mergeNFTs = async (tokenIds: number[]) => {
-    setIsActionPending(true)
-    setActionError(null)
-
-    try {
-      const hash = await writeContract(wagmiConfig, {
-        address: CONTRACT_ADDRESS,
-        abi: rabbitHoleActionsAbi,
-        functionName: "mergeTokens",
-        args: [tokenIds.map((id) => BigInt(id))],
-      })
-
-      logger.success(`Merging NFTs: ${tokenIds.join(", ")}`)
-      logger.debug(`Merging NFTs: ${tokenIds.join(", ")}, transaction hash: ${hash}`)
-      return true
-    } catch (error: any) {
-      logger.error("Error merging NFTs", error)
-      setActionError(error?.message || "Failed to merge circles. Please try again.")
-      return false
-    } finally {
-      setIsActionPending(false)
-    }
+    return await transactionModal.executeTransaction(
+      `Merging Circles #${tokenIds.join(", ")}`,
+      async () => {
+        const hash = await writeContract(wagmiConfig, {
+          address: CONTRACT_ADDRESS,
+          abi: rabbitHoleActionsAbi,
+          functionName: "mergeTokens",
+          args: [tokenIds.map((id) => BigInt(id))],
+        })
+        logger.success(`Merging NFTs: ${tokenIds.join(", ")}`)
+        return hash
+      },
+      onSuccess
+    )
   }
 
   return {
     growNFT,
     shrinkNFT,
     mergeNFTs,
-    isActionPending,
-    actionError,
+    transactionModal,
   }
 }
 

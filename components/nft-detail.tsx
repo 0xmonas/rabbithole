@@ -5,6 +5,7 @@ import type { NFT } from "@/types/nft"
 import { ArrowUp, ArrowDown, Clock, Activity, Send, Zap, Palette, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useNFTActions } from "@/hooks/use-nft-actions"
+import { TransactionModal } from "@/components/transaction-modal"
 import { TokenImage } from "@/components/token-image"
 
 interface NFTDetailProps {
@@ -33,22 +34,24 @@ const getShapeScanUrl = (txHash: string) => {
 
 export function NFTDetail({ nft, onGrow, onShrink }: NFTDetailProps) {
   const [activeTab, setActiveTab] = useState<"VISUAL" | "DATA">("VISUAL")
-  const { growNFT, shrinkNFT, isActionPending, actionError } = useNFTActions()
+  const { growNFT, shrinkNFT, transactionModal } = useNFTActions(async () => {
+    // Refresh NFTs after successful transaction
+    onGrow() // This will call refreshNFTs
+  })
 
   const handleGrow = async () => {
     if (!nft) return
     await growNFT(nft.id)
-    onGrow()
   }
 
   const handleShrink = async () => {
     if (!nft) return
     await shrinkNFT(nft.id)
-    onShrink()
   }
 
   const canGrow = nft && nft.size < nft.maxSize && nft.growCooldownRemaining === 0
   const canShrink = nft && nft.size > nft.minSize && nft.shrinkCooldownRemaining === 0
+  const isTransactionPending = transactionModal.isOpen && transactionModal.step !== "idle"
 
   const formatCooldown = (seconds: number) => {
     if (seconds === 0) return "Ready"
@@ -121,10 +124,10 @@ export function NFTDetail({ nft, onGrow, onShrink }: NFTDetailProps) {
             <div className="flex space-x-4 mb-4">
               <button
                 onClick={handleGrow}
-                disabled={!canGrow || isActionPending}
+                disabled={!canGrow || isTransactionPending}
                 className={cn(
                   "border border-black px-4 py-2 flex items-center",
-                  canGrow && !isActionPending
+                  canGrow && !isTransactionPending
                     ? "bg-black text-white hover:bg-gray-800"
                     : "bg-gray-200 text-gray-500 cursor-not-allowed",
                 )}
@@ -133,10 +136,10 @@ export function NFTDetail({ nft, onGrow, onShrink }: NFTDetailProps) {
               </button>
               <button
                 onClick={handleShrink}
-                disabled={!canShrink || isActionPending}
+                disabled={!canShrink || isTransactionPending}
                 className={cn(
                   "border border-black px-4 py-2 flex items-center",
-                  canShrink && !isActionPending
+                  canShrink && !isTransactionPending
                     ? "bg-black text-white hover:bg-gray-800"
                     : "bg-gray-200 text-gray-500 cursor-not-allowed",
                 )}
@@ -162,9 +165,15 @@ export function NFTDetail({ nft, onGrow, onShrink }: NFTDetailProps) {
               </div>
             </div>
 
-            {actionError && (
-              <div className="mt-4 p-2 border border-red-500 bg-red-50 text-red-600 max-w-md">{actionError}</div>
-            )}
+            {/* Transaction Modal handles error display */}
+            <TransactionModal
+              isOpen={transactionModal.isOpen}
+              onClose={transactionModal.closeModal}
+              step={transactionModal.step}
+              txHash={transactionModal.txHash}
+              error={transactionModal.error}
+              operation={transactionModal.operation}
+            />
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

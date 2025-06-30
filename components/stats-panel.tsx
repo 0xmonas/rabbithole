@@ -217,20 +217,20 @@ export function StatsPanel({ nfts, address }: StatsPanelProps) {
                           )}
                         </div>
                       </td>
-                      <td className="p-2">#{nft.id}</td>
-                      <td className="p-2">{nft.size}</td>
-                      <td className="p-2">{((nft.size / nft.maxSize) * 100).toFixed(1)}%</td>
-                      <td className="p-2">
-                        {nft.growCooldownRemaining > 0
-                          ? `${Math.floor(nft.growCooldownRemaining / 3600)}h ${Math.floor((nft.growCooldownRemaining % 3600) / 60)}m`
-                          : "Ready"}
-                      </td>
-                      <td className="p-2">
-                        {nft.shrinkCooldownRemaining > 0
-                          ? `${Math.floor(nft.shrinkCooldownRemaining / 3600)}h ${Math.floor((nft.shrinkCooldownRemaining % 3600) / 60)}m`
-                          : "Ready"}
-                      </td>
-                    </tr>
+                    <td className="p-2">#{nft.id}</td>
+                    <td className="p-2">{nft.size}</td>
+                    <td className="p-2">{((nft.size / nft.maxSize) * 100).toFixed(1)}%</td>
+                    <td className="p-2">
+                      {nft.growCooldownRemaining > 0
+                        ? `${Math.floor(nft.growCooldownRemaining / 3600)}h ${Math.floor((nft.growCooldownRemaining % 3600) / 60)}m`
+                        : "Ready"}
+                    </td>
+                    <td className="p-2">
+                      {nft.shrinkCooldownRemaining > 0
+                        ? `${Math.floor(nft.shrinkCooldownRemaining / 3600)}h ${Math.floor((nft.shrinkCooldownRemaining % 3600) / 60)}m`
+                        : "Ready"}
+                    </td>
+                  </tr>
                   )
                 })}
               </tbody>

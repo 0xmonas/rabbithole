@@ -5,6 +5,7 @@ import { readContract, writeContract, getPublicClient } from "@wagmi/core"
 import { wagmiConfig } from "@/config/wagmi"
 import { parseAbiItem, getAddress } from "viem"
 import type { NFT } from "@/types/nft"
+import { useTransactionModal } from "./use-transaction-modal"
 import { logger } from "@/lib/logger"
 
 // Garden contract address and ABI - FIXED CHECKSUM
@@ -80,11 +81,10 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   ])
 }
 
-export function useGarden(address: string | null) {
+export function useGarden(address: string | null, onSuccess?: () => void | Promise<void>) {
   const [gardenNFTs, setGardenNFTs] = useState<NFT[]>([])
   const [loading, setLoading] = useState(false)
-  const [isActionPending, setIsActionPending] = useState(false)
-  const [actionError, setActionError] = useState<string | null>(null)
+  const transactionModal = useTransactionModal()
 
   // 🌱 Fetch Garden NFTs for user
   const fetchGardenNFTs = async () => {
@@ -349,74 +349,56 @@ export function useGarden(address: string | null) {
 
   // 🌱 Plant seeds (send NFTs to garden)
   const plantSeeds = async (maxTokenId: number = 10000) => {
-    setIsActionPending(true)
-    setActionError(null)
-
-    try {
-      const hash = await writeContract(wagmiConfig, {
-        address: GARDEN_CONTRACT_ADDRESS,
-        abi: gardenAbi,
-        functionName: "plant_seeds",
-        args: [BigInt(maxTokenId)],
-      })
-
-      console.log(`🌱 Planting seeds, transaction hash: ${hash}`)
-      return true
-    } catch (error: any) {
-      console.error("💥 Error planting seeds:", error)
-      setActionError(error?.message || "Failed to plant seeds. Please try again.")
-      return false
-    } finally {
-      setIsActionPending(false)
-    }
+    return await transactionModal.executeTransaction(
+      "Planting Seeds in Garden",
+      async () => {
+        const hash = await writeContract(wagmiConfig, {
+          address: GARDEN_CONTRACT_ADDRESS,
+          abi: gardenAbi,
+          functionName: "plant_seeds",
+          args: [BigInt(maxTokenId)],
+        })
+        console.log(`🌱 Planting seeds, transaction hash: ${hash}`)
+        return hash
+      },
+      onSuccess
+    )
   }
 
   // 🌱 Uproot (get NFTs back from garden)
   const uproot = async () => {
-    setIsActionPending(true)
-    setActionError(null)
-
-    try {
-      const hash = await writeContract(wagmiConfig, {
-        address: GARDEN_CONTRACT_ADDRESS,
-        abi: gardenAbi,
-        functionName: "uproot",
-        args: [],
-      })
-
-      console.log(`🌱 Uprooting, transaction hash: ${hash}`)
-      return true
-    } catch (error: any) {
-      console.error("💥 Error uprooting:", error)
-      setActionError(error?.message || "Failed to uproot. Please try again.")
-      return false
-    } finally {
-      setIsActionPending(false)
-    }
+    return await transactionModal.executeTransaction(
+      "Uprooting Seeds from Garden",
+      async () => {
+        const hash = await writeContract(wagmiConfig, {
+          address: GARDEN_CONTRACT_ADDRESS,
+          abi: gardenAbi,
+          functionName: "uproot",
+          args: [],
+        })
+        console.log(`🌱 Uprooting, transaction hash: ${hash}`)
+        return hash
+      },
+      onSuccess
+    )
   }
 
   // 🌱 Work garden (auto-grow planted NFTs)
   const workGarden = async (maxTokenId: number = 10000) => {
-    setIsActionPending(true)
-    setActionError(null)
-
-    try {
-      const hash = await writeContract(wagmiConfig, {
-        address: GARDEN_CONTRACT_ADDRESS,
-        abi: gardenAbi,
-        functionName: "work_garden",
-        args: [BigInt(maxTokenId)],
-      })
-
-      console.log(`🌱 Working garden, transaction hash: ${hash}`)
-      return true
-    } catch (error: any) {
-      console.error("💥 Error working garden:", error)
-      setActionError(error?.message || "Failed to work garden. Please try again.")
-      return false
-    } finally {
-      setIsActionPending(false)
-    }
+    return await transactionModal.executeTransaction(
+      "Working Garden (Auto-Growth)",
+      async () => {
+        const hash = await writeContract(wagmiConfig, {
+          address: GARDEN_CONTRACT_ADDRESS,
+          abi: gardenAbi,
+          functionName: "work_garden",
+          args: [BigInt(maxTokenId)],
+        })
+        console.log(`🌱 Working garden, transaction hash: ${hash}`)
+        return hash
+      },
+      onSuccess
+    )
   }
 
   // Fetch garden NFTs when address changes
@@ -431,7 +413,6 @@ export function useGarden(address: string | null) {
     uproot,
     workGarden,
     refreshGarden: fetchGardenNFTs,
-    isActionPending,
-    actionError,
+    transactionModal,
   }
 } 
