@@ -15,13 +15,15 @@ interface NFTDetailProps {
 
 // 🎯 ELITE UI: Action icons mapping with consistent colors
 const getActionIcon = (action: string) => {
-  if (action.includes('Grown')) return <ArrowUp size={12} className="mr-2 text-black" />
-  if (action.includes('Shrunk')) return <ArrowDown size={12} className="mr-2 text-black" />
-  if (action.includes('Minted')) return <Zap size={12} className="mr-2 text-black" />
-  if (action.includes('Transferred')) return <Send size={12} className="mr-2 text-black" />
-  if (action.includes('merging')) return <Activity size={12} className="mr-2 text-black" />
-  if (action.includes('Special metadata')) return <Palette size={12} className="mr-2 text-black" />
-  return <Activity size={12} className="mr-2 text-black" />
+  if (action.includes('📈') || action.includes('Grown')) return <ArrowUp size={12} className="mr-2 text-green-600" />
+  if (action.includes('📉') || action.includes('Shrunk')) return <ArrowDown size={12} className="mr-2 text-red-600" />
+  if (action.includes('Minted')) return <Zap size={12} className="mr-2 text-blue-600" />
+  if (action.includes('🌱') || action.includes('Planted')) return <div className="mr-2 text-green-500 text-xs">🌱</div>
+  if (action.includes('🌳') || action.includes('Uprooted')) return <div className="mr-2 text-brown-600 text-xs">🌳</div>
+  if (action.includes('Transferred')) return <Send size={12} className="mr-2 text-blue-500" />
+  if (action.includes('🔄') || action.includes('Merged') || action.includes('merging')) return <Activity size={12} className="mr-2 text-purple-600" />
+  if (action.includes('🎨') || action.includes('Special metadata')) return <Palette size={12} className="mr-2 text-yellow-600" />
+  return <Activity size={12} className="mr-2 text-gray-600" />
 }
 
 // 🔗 ShapeScan transaction link

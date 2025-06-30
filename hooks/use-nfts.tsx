@@ -38,6 +38,7 @@ const rabbitHoleAbi = [
 
 // Contract constants
 const DAILY_COOLDOWN = 86400 // 24 hours in seconds
+const GARDEN_CONTRACT_ADDRESS = "0x2940574AF75D350BF37Ceb73CA5dE8e5ADA425c4" as `0x${string}`
 
 // 🔥 ELITE LEVEL: Action History Events
 const ACTION_EVENTS = {
@@ -87,6 +88,20 @@ async function fetchTokenHistory(tokenId: number): Promise<{ action: string; tim
           blockNumber: Number(log.blockNumber),
           txHash: log.transactionHash
         })
+      } else if (log.args.to.toLowerCase() === GARDEN_CONTRACT_ADDRESS.toLowerCase()) {
+        history.push({
+          action: `🌱 Planted in Garden (${log.args.from.slice(0, 6)}...${log.args.from.slice(-4)} → Garden)`,
+          timestamp: Number(block.timestamp),
+          blockNumber: Number(log.blockNumber),
+          txHash: log.transactionHash
+        })
+      } else if (log.args.from.toLowerCase() === GARDEN_CONTRACT_ADDRESS.toLowerCase()) {
+        history.push({
+          action: `🌳 Uprooted from Garden (Garden → ${log.args.to.slice(0, 6)}...${log.args.to.slice(-4)})`,
+          timestamp: Number(block.timestamp),
+          blockNumber: Number(log.blockNumber),
+          txHash: log.transactionHash
+        })
       } else {
         history.push({
           action: `Transferred from ${log.args.from.slice(0, 6)}...${log.args.from.slice(-4)} to ${log.args.to.slice(0, 6)}...${log.args.to.slice(-4)}`,
@@ -98,92 +113,112 @@ async function fetchTokenHistory(tokenId: number): Promise<{ action: string; tim
     }
 
     // 📊 2. Fetch CircleGrown events
-    const grownLogs = await withTimeout(
-      publicClient!.getLogs({
-        address: CONTRACT_ADDRESS,
-        event: ACTION_EVENTS.CircleGrown,
-        args: { tokenId: BigInt(tokenId) },
-        fromBlock: BigInt(0),
-        toBlock: 'latest'
-      }),
-      8000
-    )
+    try {
+      const grownLogs = await withTimeout(
+        publicClient!.getLogs({
+          address: CONTRACT_ADDRESS,
+          event: ACTION_EVENTS.CircleGrown,
+          args: { tokenId: BigInt(tokenId) },
+          fromBlock: BigInt(0),
+          toBlock: 'latest'
+        }),
+        12000
+      )
 
-    for (const log of grownLogs as any[]) {
-      const block = await publicClient!.getBlock({ blockNumber: log.blockNumber })
-      history.push({
-        action: `Grown to size ${log.args.newSize}`,
-        timestamp: Number(block.timestamp),
-        blockNumber: Number(log.blockNumber),
-        txHash: log.transactionHash
-      })
-    }
-
-    // 📊 3. Fetch CircleShrunk events
-    const shrunkLogs = await withTimeout(
-      publicClient!.getLogs({
-        address: CONTRACT_ADDRESS,
-        event: ACTION_EVENTS.CircleShrunk,
-        args: { tokenId: BigInt(tokenId) },
-        fromBlock: BigInt(0),
-        toBlock: 'latest'
-      }),
-      8000
-    )
-
-    for (const log of shrunkLogs as any[]) {
-      const block = await publicClient!.getBlock({ blockNumber: log.blockNumber })
-      history.push({
-        action: `Shrunk to size ${log.args.newSize}`,
-        timestamp: Number(block.timestamp),
-        blockNumber: Number(log.blockNumber),
-        txHash: log.transactionHash
-      })
-    }
-
-    // 📊 4. Fetch CirclesMerged events (as source)
-    const mergedLogs = await withTimeout(
-      publicClient!.getLogs({
-        address: CONTRACT_ADDRESS,
-        event: ACTION_EVENTS.CirclesMerged,
-        fromBlock: BigInt(0),
-        toBlock: 'latest'
-      }),
-      8000
-    )
-
-    for (const log of mergedLogs as any[]) {
-      if (log.args.mergedTokenIds.includes(BigInt(tokenId))) {
+      logger.debug(`Token #${tokenId}: Found ${(grownLogs as any[]).length} grow events`)
+      for (const log of grownLogs as any[]) {
         const block = await publicClient!.getBlock({ blockNumber: log.blockNumber })
         history.push({
-          action: `Merged with other tokens → Token #${log.args.newTokenId}`,
+          action: `📈 Grown to size ${log.args.newSize}`,
           timestamp: Number(block.timestamp),
           blockNumber: Number(log.blockNumber),
           txHash: log.transactionHash
         })
       }
+    } catch (error) {
+      logger.warn(`Failed to fetch grow events for token #${tokenId}`, error)
+    }
+
+    // 📊 3. Fetch CircleShrunk events  
+    try {
+      const shrunkLogs = await withTimeout(
+        publicClient!.getLogs({
+          address: CONTRACT_ADDRESS,
+          event: ACTION_EVENTS.CircleShrunk,
+          args: { tokenId: BigInt(tokenId) },
+          fromBlock: BigInt(0),
+          toBlock: 'latest'
+        }),
+        12000
+      )
+
+      logger.debug(`Token #${tokenId}: Found ${(shrunkLogs as any[]).length} shrink events`)
+      for (const log of shrunkLogs as any[]) {
+        const block = await publicClient!.getBlock({ blockNumber: log.blockNumber })
+        history.push({
+          action: `📉 Shrunk to size ${log.args.newSize}`,
+          timestamp: Number(block.timestamp),
+          blockNumber: Number(log.blockNumber),
+          txHash: log.transactionHash
+        })
+      }
+    } catch (error) {
+      logger.warn(`Failed to fetch shrink events for token #${tokenId}`, error)
+    }
+
+    // 📊 4. Fetch CirclesMerged events (as source)
+    try {
+      const mergedLogs = await withTimeout(
+        publicClient!.getLogs({
+          address: CONTRACT_ADDRESS,
+          event: ACTION_EVENTS.CirclesMerged,
+          fromBlock: BigInt(0),
+          toBlock: 'latest'
+        }),
+        12000
+      )
+
+      logger.debug(`Token #${tokenId}: Found ${(mergedLogs as any[]).length} merge events to check`)
+      for (const log of mergedLogs as any[]) {
+        if (log.args.mergedTokenIds.includes(BigInt(tokenId))) {
+          const block = await publicClient!.getBlock({ blockNumber: log.blockNumber })
+          history.push({
+            action: `🔄 Merged with other tokens → Token #${log.args.newTokenId}`,
+            timestamp: Number(block.timestamp),
+            blockNumber: Number(log.blockNumber),
+            txHash: log.transactionHash
+          })
+        }
+      }
+    } catch (error) {
+      logger.warn(`Failed to fetch merge events for token #${tokenId}`, error)
     }
 
     // 📊 5. Fetch SpecialMetadataSet events
-    const metadataLogs = await withTimeout(
-      publicClient!.getLogs({
-        address: CONTRACT_ADDRESS,
-        event: ACTION_EVENTS.SpecialMetadataSet,
-        args: { tokenId: BigInt(tokenId) },
-        fromBlock: BigInt(0),
-        toBlock: 'latest'
-      }),
-      8000
-    )
+    try {
+      const metadataLogs = await withTimeout(
+        publicClient!.getLogs({
+          address: CONTRACT_ADDRESS,
+          event: ACTION_EVENTS.SpecialMetadataSet,
+          args: { tokenId: BigInt(tokenId) },
+          fromBlock: BigInt(0),
+          toBlock: 'latest'
+        }),
+        12000
+      )
 
-    for (const log of metadataLogs as any[]) {
-      const block = await publicClient!.getBlock({ blockNumber: log.blockNumber })
-      history.push({
-        action: `Special metadata set (1/1 status)`,
-        timestamp: Number(block.timestamp),
-        blockNumber: Number(log.blockNumber),
-        txHash: log.transactionHash
-      })
+      logger.debug(`Token #${tokenId}: Found ${(metadataLogs as any[]).length} metadata events`)
+      for (const log of metadataLogs as any[]) {
+        const block = await publicClient!.getBlock({ blockNumber: log.blockNumber })
+        history.push({
+          action: `🎨 Special metadata set (1/1 status)`,
+          timestamp: Number(block.timestamp),
+          blockNumber: Number(log.blockNumber),
+          txHash: log.transactionHash
+        })
+      }
+    } catch (error) {
+      logger.warn(`Failed to fetch metadata events for token #${tokenId}`, error)
     }
 
     // Sort by block number (chronological order)
@@ -248,16 +283,17 @@ export function useNFTs(address: string | null) {
       const history = await fetchTokenHistory(tokenId)
 
       const now = Math.floor(Date.now() / 1000)
-      const lastGrowTime = Number((tokenInfo as any)[0])
-      const lastShrinkTime = Number((tokenInfo as any)[1])
+      const size = Number((tokenInfo as any)[0])
+      const lastGrowTime = Number((tokenInfo as any)[1])
+      const lastShrinkTime = Number((tokenInfo as any)[2])
 
       return {
         id: tokenId,
-        size: Number((tokenInfo as any)[0]),
+        size: size,
         minSize: 1,
         maxSize: 1000,
-        lastGrowTime: Number((tokenInfo as any)[1]),
-        lastShrinkTime: Number((tokenInfo as any)[2]),
+        lastGrowTime: lastGrowTime,
+        lastShrinkTime: lastShrinkTime,
         growCooldownRemaining: Math.max(0, (lastGrowTime + DAILY_COOLDOWN) - now),
         shrinkCooldownRemaining: Math.max(0, (lastShrinkTime + DAILY_COOLDOWN) - now),
         imageUrl,
