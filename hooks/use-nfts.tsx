@@ -26,6 +26,13 @@ const rabbitHoleAbi = [
     stateMutability: "view",
     type: "function",
   },
+  {
+    inputs: [{ internalType: "uint256", name: "tokenId", type: "uint256" }],
+    name: "tokenURI",
+    outputs: [{ internalType: "string", name: "", type: "string" }],
+    stateMutability: "view",
+    type: "function",
+  },
 ] as const
 
 // Contract constants
@@ -221,6 +228,34 @@ export function useNFTs(address: string | null) {
         5000
       )
 
+      // 2. Fetch token URI and extract image
+      let imageUrl: string | undefined
+      try {
+        const tokenURI = await withTimeout(
+          readContract(wagmiConfig, {
+            address: CONTRACT_ADDRESS,
+            abi: rabbitHoleAbi,
+            functionName: "tokenURI",
+            args: [BigInt(tokenId)],
+          }),
+          5000
+        ) as string
+
+        // Parse Base64-encoded JSON metadata
+        if (tokenURI.startsWith('data:application/json;base64,')) {
+          const base64Data = tokenURI.replace('data:application/json;base64,', '')
+          const jsonData = atob(base64Data)
+          const metadata = JSON.parse(jsonData)
+          
+          if (metadata.image) {
+            imageUrl = metadata.image // This is already a data URL: "data:image/svg+xml;base64,..."
+            console.log(`🖼️ Token #${tokenId} image URL extracted from contract`)
+          }
+        }
+      } catch (error) {
+        console.warn(`⚠️ Could not fetch image for token #${tokenId}:`, error)
+      }
+
       // Calculate cooldowns
       const now = Math.floor(Date.now() / 1000)
       const lastGrowTime = Number(tokenInfo[1])
@@ -228,7 +263,7 @@ export function useNFTs(address: string | null) {
       const growTimeElapsed = now - lastGrowTime
       const shrinkTimeElapsed = now - lastShrinkTime
 
-      // 2. 🔥 ELITE FEATURE: Fetch comprehensive action history
+      // 3. 🔥 ELITE FEATURE: Fetch comprehensive action history
       const history = await fetchTokenHistory(tokenId)
 
       return {
@@ -242,6 +277,7 @@ export function useNFTs(address: string | null) {
           lastGrowTime === 0 ? 0 : growTimeElapsed >= DAILY_COOLDOWN ? 0 : DAILY_COOLDOWN - growTimeElapsed,
         shrinkCooldownRemaining:
           lastShrinkTime === 0 ? 0 : shrinkTimeElapsed >= DAILY_COOLDOWN ? 0 : DAILY_COOLDOWN - shrinkTimeElapsed,
+        imageUrl: imageUrl, // 🎯 REAL CONTRACT-GENERATED IMAGE!
         history: history, // 🎯 REAL ACTION HISTORY with transaction hashes!
       }
     } catch (error) {

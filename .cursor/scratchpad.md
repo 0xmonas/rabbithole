@@ -414,6 +414,122 @@ const handleConnect = () => openConnectModal?.()
 - On-chain SVG generation is elegant and gas-efficient
 - ERC2981 royalty support is properly implemented
 
+### Garden Wallet Integration Confirmation: ✅ WORKING PROPERLY
+
+**Status:** Garden functionality fully integrated with wallet connection
+**User Concern:** Garden should check connected wallet
+**Verification:** Garden already properly checks wallet connection
+
+**How Garden Works with Wallet:**
+1. **Address Dependency:** Garden receives `address` prop from main app (line 318 in RabbitHoleAppComponent.tsx)
+2. **Automatic Updates:** `useEffect(() => { fetchGardenNFTs() }, [address])` ensures garden updates when wallet changes
+3. **Wallet Validation:** `if (!address) { setGardenNFTs([]); return }` prevents operations without wallet
+4. **Security:** All garden transactions require connected wallet to execute
+
+**Technical Implementation:**
+```tsx
+// In RabbitHoleAppComponent.tsx
+{activeSection === "GARDEN" && (
+  <GardenPanel 
+    address={address || null}  // ✅ Wallet address passed
+    userNFTs={nfts}           // ✅ User's NFTs passed
+    onRefreshUserNFTs={refreshNFTs}
+  />
+)}
+
+// In use-garden.tsx
+export function useGarden(address: string | null) {
+  useEffect(() => {
+    fetchGardenNFTs()  // ✅ Refetches when address changes
+  }, [address])
+
+  const fetchGardenNFTs = async () => {
+    if (!address) {  // ✅ Validates wallet connection
+      setGardenNFTs([])
+      return
+    }
+    // ... garden operations for connected wallet
+  }
+}
+```
+
+**Conclusion:** Garden functionality is already properly secured and integrated with wallet connection. No changes needed.
+
+### Circle Visual Rendering Fix: ✅ COMPLETED
+
+**Status:** Fixed circle size rendering in NFT Gallery
+**Problem:** All circles appeared same size due to hardcoded values and minimum size constraints
+**Solution:** Updated calculation to properly reflect actual token sizes
+
+**Issues Fixed:**
+1. **Hardcoded MaxSize:** Changed `(nft.size / 1000)` to `(nft.size / nft.maxSize)` for accurate scaling
+2. **Minimum Size Too Large:** Reduced `Math.max(20, ...)` to `Math.max(4, ...)` for better differentiation
+3. **Inconsistent Rendering:** Now all components (Gallery, Detail, Garden) use consistent size calculations
+
+**Technical Changes:**
+```tsx
+// Before (NFT Gallery):
+width: `${Math.max(20, (nft.size / 1000) * 100)}%`
+
+// After (NFT Gallery):
+width: `${Math.max(4, (nft.size / nft.maxSize) * 100)}%`
+
+// All components now consistent:
+// - NFT Gallery: ✅ Fixed
+// - NFT Detail: ✅ Already correct
+// - Garden Panel: ✅ Already correct
+```
+
+**Result:** Circles now properly scale based on actual token size - small tokens appear small, large tokens appear large.
+
+### Hover Preview & OpenSea Integration: ✅ COMPLETED
+
+**Status:** Added beautiful hover preview and OpenSea redirect functionality
+**Features:** Elegant token image interactions with external marketplace integration
+**Implementation:** Created reusable TokenImage component with comprehensive functionality
+
+**New Features:**
+1. **Hover Preview:** Large popup preview when hovering over token images
+2. **OpenSea Redirect:** Click any token to view on OpenSea marketplace  
+3. **Visual Indicators:** Small external link icon and "View on OpenSea" tooltip
+4. **Smooth Animations:** Scale effect on hover + smooth transitions
+5. **Smart Positioning:** Preview positioned to avoid screen edges
+
+**Technical Implementation:**
+```tsx
+// New TokenImage component with:
+- Dynamic hover preview (small/medium/large sizes)
+- OpenSea URL generation from env variable
+- Click handling with external link opening
+- Fallback to manual circle if no image
+- Configurable display options per component
+
+// Environment Variable:
+NEXT_PUBLIC_OPENSEA_URL=https://opensea.io/collection/rabbit-hole-shape
+
+// Integration across components:
+- NFT Gallery: Medium preview, disabled in merge mode
+- NFT Detail: Large preview, full functionality  
+- Garden Panel: Medium preview, full functionality
+```
+
+**User Experience:**
+- ✅ Hover over any token image → Large preview appears
+- ✅ Click any token image → Opens OpenSea in new tab
+- ✅ Smooth animations and transitions
+- ✅ Visual feedback with icons and tooltips
+- ✅ Preserves existing designs and functionality
+- ✅ Smart behavior in different contexts (merge mode, etc.)
+
+**Components Updated:**
+- `components/token-image.tsx` - New reusable component
+- `components/nft-gallery.tsx` - Integrated TokenImage
+- `components/nft-detail.tsx` - Integrated TokenImage  
+- `components/garden-panel.tsx` - Integrated TokenImage
+- `lib/utils.ts` - Added OpenSea URL utility
+
+**Result:** Professional token interaction system matching modern NFT marketplace standards.
+
 ---
 
 **Last Updated:** 2025-01-27  

@@ -231,7 +231,7 @@ function RabbitHoleAppInner() {
                     />
                   )}
 
-                  {activeSection === "STATS" && <StatsPanel nfts={nfts} />}
+                  {activeSection === "STATS" && <StatsPanel nfts={nfts} address={address || null} />}
 
                   {activeSection === "MERGE" && (
                     <MergePanel
@@ -355,8 +355,15 @@ function RabbitHoleAppInner() {
                         <div className="border-b border-black p-2 bg-gray-100">
                           <div className="uppercase font-bold">CREDITS</div>
                         </div>
-                        <div className="p-4">
-                          <p>Created by @0xmonas</p>
+                        <div className="p-4 space-y-3">
+                          <div>
+                            <p className="font-bold mb-1">ORIGINAL PROJECT</p>
+                            <p>Created by @0xmonas</p>
+                          </div>
+                          <div>
+                            <p className="font-bold mb-1">GARDEN CONTRACT</p>
+                            <p>Special thanks to @takenstheorem for creating the Garden contract and their invaluable contributions to the Rabbit Hole community.</p>
+                          </div>
                         </div>
                       </div>
                     </div>

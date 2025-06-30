@@ -5,6 +5,7 @@ import type { NFT } from "@/types/nft"
 import { ArrowUp, ArrowDown, Clock, Activity, Send, Zap, Palette, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useNFTActions } from "@/hooks/use-nft-actions"
+import { TokenImage } from "@/components/token-image"
 
 interface NFTDetailProps {
   nft: NFT | undefined
@@ -97,22 +98,22 @@ export function NFTDetail({ nft, onGrow, onShrink }: NFTDetailProps) {
           <div className="flex flex-col items-center justify-center h-full">
             <div className="mb-6">
               <div className="text-center mb-2 font-bold">rh #{nft.id}</div>
-              <div
-                className="border-2 border-black rounded-sm p-4 bg-white"
-                style={{ width: "300px", height: "300px" }}
-              >
-                <div className="w-full h-full flex items-center justify-center">
-                  <div
-                    className="rounded-full bg-black transition-all duration-500"
-                    style={{
-                      width: `${(nft.size / nft.maxSize) * 100}%`,
-                      height: `${(nft.size / nft.maxSize) * 100}%`,
-                      maxWidth: "100%",
-                      maxHeight: "100%",
-                    }}
-                  ></div>
-                </div>
-              </div>
+              <TokenImage
+                tokenId={nft.id}
+                imageUrl={nft.imageUrl}
+                size={nft.size}
+                maxSize={nft.maxSize}
+                containerStyle={{
+                  width: "300px",
+                  height: "300px",
+                  border: "2px solid black",
+                  borderRadius: "4px",
+                  padding: "16px",
+                  backgroundColor: "white",
+                }}
+                previewSize="large"
+                showOpenSeaLink={true}
+              />
             </div>
 
             <div className="flex space-x-4 mb-4">

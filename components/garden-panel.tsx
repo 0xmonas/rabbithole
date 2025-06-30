@@ -4,6 +4,7 @@ import { useState } from "react"
 import type { NFT } from "@/types/nft"
 import { cn } from "@/lib/utils"
 import { useGarden } from "@/hooks/use-garden"
+import { TokenImage } from "@/components/token-image"
 import { Sprout, ArrowUpFromLine, ArrowDownToLine, Zap, Clock, Leaf } from "lucide-react"
 
 interface GardenPanelProps {
@@ -83,18 +84,28 @@ export function GardenPanel({ address, userNFTs, onRefreshUserNFTs }: GardenPane
             </div>
             <div className="p-3">
               <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="text-gray-500">Planted Circles</div>
+                <div className="text-gray-500">Your Planted</div>
                 <div className="font-mono">{gardenNFTs.length}</div>
 
-                <div className="text-gray-500">Total Size</div>
+                <div className="text-gray-500">Your Total Size</div>
                 <div className="font-mono">{totalGardenSize}</div>
 
-                <div className="text-gray-500">Avg Size</div>
+                <div className="text-gray-500">Your Avg Size</div>
                 <div className="font-mono">{avgSize}</div>
 
-                <div className="text-gray-500">Ready to Grow</div>
+                <div className="text-gray-500">Your Ready to Grow</div>
                 <div className="font-mono text-green-600">{readyToGrow}</div>
               </div>
+              
+              {/* Garden Status Message */}
+              {gardenNFTs.length > 0 && userNFTs.length === 0 && (
+                <div className="mt-2 p-2 border border-black bg-gray-50 text-xs">
+                  <div className="flex items-center">
+                    <Sprout size={12} className="mr-2" />
+                    <span>Your NFTs are safely growing in the garden</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
 
@@ -165,12 +176,24 @@ export function GardenPanel({ address, userNFTs, onRefreshUserNFTs }: GardenPane
                   "w-full border border-black px-3 py-2 text-xs flex items-center justify-center",
                   readyToGrow > 0 && !isActionPending
                     ? "bg-blue-500 text-white hover:bg-blue-600"
-                    : "bg-gray-200 text-gray-500 cursor-not-allowed"
+                    : readyToGrow === 0 && gardenNFTs.length > 0
+                      ? "bg-yellow-200 text-yellow-800 cursor-not-allowed"
+                      : "bg-gray-200 text-gray-500 cursor-not-allowed"
                 )}
               >
                 <Zap size={12} className="mr-2" />
-                WORK GARDEN ({readyToGrow})
+                WORK GARDEN
               </button>
+              
+              {/* Help Message */}
+              {userNFTs.length === 0 && gardenNFTs.length === 0 && (
+                <div className="mt-3 p-2 border border-black bg-gray-50 text-xs">
+                  <div className="flex items-center">
+                    <ArrowDownToLine size={12} className="mr-2" />
+                    <span>Buy NFTs from marketplace to start using Garden</span>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -216,20 +239,20 @@ export function GardenPanel({ address, userNFTs, onRefreshUserNFTs }: GardenPane
 
                     {/* Visual Circle */}
                     <div className="mb-3 flex justify-center">
-                      <div
-                        className="border border-black bg-white"
-                        style={{ width: "60px", height: "60px" }}
-                      >
-                        <div className="w-full h-full flex items-center justify-center">
-                          <div
-                            className="rounded-full bg-black transition-all duration-500"
-                            style={{
-                              width: `${(nft.size / nft.maxSize) * 100}%`,
-                              height: `${(nft.size / nft.maxSize) * 100}%`,
-                            }}
-                          ></div>
-                        </div>
-                      </div>
+                      <TokenImage
+                        tokenId={nft.id}
+                        imageUrl={nft.imageUrl}
+                        size={nft.size}
+                        maxSize={nft.maxSize}
+                        containerStyle={{
+                          width: "60px",
+                          height: "60px",
+                          border: "1px solid black",
+                          backgroundColor: "white",
+                        }}
+                        previewSize="medium"
+                        showOpenSeaLink={true}
+                      />
                     </div>
 
                     {/* Status */}
@@ -270,21 +293,30 @@ export function GardenPanel({ address, userNFTs, onRefreshUserNFTs }: GardenPane
           </div>
           <div className="p-4 text-xs space-y-3">
             <div>
-              <div className="font-bold mb-1">🌱 PLANT SEEDS</div>
+              <div className="font-bold mb-1 flex items-center">
+                <ArrowDownToLine size={12} className="mr-2" />
+                PLANT SEEDS
+              </div>
               <p className="text-gray-600">
                 Transfer your circles to the Garden contract for automated growth. Your circles will be safely stored and you can retrieve them anytime.
               </p>
             </div>
             
             <div>
-              <div className="font-bold mb-1">⚡ WORK GARDEN</div>
+              <div className="font-bold mb-1 flex items-center">
+                <Zap size={12} className="mr-2" />
+                WORK GARDEN
+              </div>
               <p className="text-gray-600">
-                Automatically grow all eligible circles in the garden (those past their 24h cooldown). Anyone can call this function to help the community!
+                Community service function! Automatically grows ALL eligible tokens in the garden (any token past its 24h cooldown), not just yours. Anyone can call this to help the entire community grow their tokens faster.
               </p>
             </div>
             
             <div>
-              <div className="font-bold mb-1">🔄 UPROOT</div>
+              <div className="font-bold mb-1 flex items-center">
+                <ArrowUpFromLine size={12} className="mr-2" />
+                UPROOT
+              </div>
               <p className="text-gray-600">
                 Retrieve all your planted circles back to your wallet. They'll return with any growth that happened while in the garden.
               </p>

@@ -4,6 +4,7 @@ import { useState } from "react"
 import type { NFT } from "@/types/nft"
 import { cn } from "@/lib/utils"
 import { OpenSeaRedirect } from "@/components/opensea-redirect"
+import { TokenImage } from "@/components/token-image"
 
 interface NFTGalleryProps {
   nfts: NFT[]
@@ -71,20 +72,20 @@ export function NFTGallery({
         >
           <div className="flex items-center space-x-3">
             <div className="relative">
-              <div
-                className="w-10 h-10 border border-black flex items-center justify-center"
-                style={{
+              <TokenImage
+                tokenId={nft.id}
+                imageUrl={nft.imageUrl}
+                size={nft.size}
+                maxSize={nft.maxSize}
+                containerStyle={{
+                  width: "40px",
+                  height: "40px",
+                  border: "1px solid black",
                   boxShadow: "2px 2px 0px 0px rgba(0,0,0,0.3)",
                 }}
-              >
-                <div
-                  className="rounded-full bg-black"
-                  style={{
-                    width: `${Math.max(20, (nft.size / 1000) * 100)}%`,
-                    height: `${Math.max(20, (nft.size / 1000) * 100)}%`,
-                  }}
-                ></div>
-              </div>
+                previewSize="medium"
+                showOpenSeaLink={!mergeMode} // Don't show OpenSea link in merge mode
+              />
               {mergeMode && (
                 <div
                   className={cn(

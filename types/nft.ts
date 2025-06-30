@@ -7,6 +7,7 @@ export interface NFT {
   lastShrinkTime: number
   growCooldownRemaining: number
   shrinkCooldownRemaining: number
+  imageUrl?: string // SVG image URL from contract's tokenURI
   history?: {
     action: string
     timestamp: number
