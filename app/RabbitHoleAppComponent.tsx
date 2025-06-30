@@ -242,31 +242,41 @@ function RabbitHoleAppInner() {
                 {/* Main Content Area */}
                 <div className="flex-1 flex flex-col overflow-hidden">
                   {activeSection === "GALLERY" && (
-                    <NFTDetail
-                      nft={nfts.find((nft) => nft.id === selectedNFT)}
-                      onGrow={refreshNFTs}
-                      onShrink={refreshNFTs}
-                    />
+                    <div className="flex-1 overflow-y-auto">
+                      <NFTDetail
+                        nft={nfts.find((nft) => nft.id === selectedNFT)}
+                        onGrow={refreshNFTs}
+                        onShrink={refreshNFTs}
+                      />
+                    </div>
                   )}
 
-                  {activeSection === "STATS" && <StatsPanel nfts={nfts} address={address || null} />}
+                  {activeSection === "STATS" && (
+                    <div className="flex-1 overflow-y-auto">
+                      <StatsPanel nfts={nfts} address={address || null} />
+                    </div>
+                  )}
 
                   {activeSection === "MERGE" && (
-                    <MergePanel
-                      nfts={nfts}
-                      onMergeComplete={refreshNFTs}
-                      onToggleMergeMode={handleToggleMergeMode}
-                      mergeMode={mergeMode}
-                      selectedNFTsForMerge={selectedNFTsForMerge}
-                    />
+                    <div className="flex-1 overflow-y-auto">
+                      <MergePanel
+                        nfts={nfts}
+                        onMergeComplete={refreshNFTs}
+                        onToggleMergeMode={handleToggleMergeMode}
+                        mergeMode={mergeMode}
+                        selectedNFTsForMerge={selectedNFTsForMerge}
+                      />
+                    </div>
                   )}
 
                   {activeSection === "GARDEN" && (
-                    <GardenPanel 
-                      address={address || null}
-                      userNFTs={nfts}
-                      onRefreshUserNFTs={refreshNFTs}
-                    />
+                    <div className="flex-1 overflow-y-auto">
+                      <GardenPanel 
+                        address={address || null}
+                        userNFTs={nfts}
+                        onRefreshUserNFTs={refreshNFTs}
+                      />
+                    </div>
                   )}
 
                   {activeSection === "ABOUT" && (
