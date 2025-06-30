@@ -5,6 +5,7 @@ import { ConnectButton } from "@/components/connect-button"
 import { NFTGallery } from "@/components/nft-gallery"
 import { NFTDetail } from "@/components/nft-detail"
 import { MergePanel } from "@/components/merge-panel"
+import { GardenPanel } from "@/components/garden-panel"
 import { StatsPanel } from "@/components/stats-panel"
 import { OpenSeaRedirect } from "@/components/opensea-redirect"
 import { NetworkSwitchModal } from "@/components/network-switch-modal"
@@ -62,7 +63,8 @@ function RabbitHoleAppInner() {
     { id: "GALLERY", name: "GALLERY [S0.1]" },
     { id: "STATS", name: "STATS [S0.2]" },
     { id: "MERGE", name: "MERGE [S0.3]" },
-    { id: "ABOUT", name: "ABOUT [S0.4]" },
+    { id: "GARDEN", name: "GARDEN [S0.4]" },
+    { id: "ABOUT", name: "ABOUT [S0.5]" },
   ]
 
   // Toggle NFT selection for merge
@@ -240,6 +242,14 @@ function RabbitHoleAppInner() {
                       onToggleMergeMode={handleToggleMergeMode}
                       mergeMode={mergeMode}
                       selectedNFTsForMerge={selectedNFTsForMerge}
+                    />
+                  )}
+
+                  {activeSection === "GARDEN" && (
+                    <GardenPanel 
+                      address={address || null}
+                      userNFTs={nfts}
+                      onRefreshUserNFTs={refreshNFTs}
                     />
                   )}
 
