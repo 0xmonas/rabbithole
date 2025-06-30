@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import type { NFT } from "@/types/nft"
-import { ArrowUp, ArrowDown, Clock } from "lucide-react"
+import { ArrowUp, ArrowDown, Clock, Activity, Send, Zap, Palette } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useNFTActions } from "@/hooks/use-nft-actions"
 
@@ -10,6 +10,17 @@ interface NFTDetailProps {
   nft: NFT | undefined
   onGrow: () => void
   onShrink: () => void
+}
+
+// 🎯 ELITE UI: Action icons mapping
+const getActionIcon = (action: string) => {
+  if (action.includes('Grown')) return <ArrowUp size={12} className="mr-2 text-green-600" />
+  if (action.includes('Shrunk')) return <ArrowDown size={12} className="mr-2 text-red-600" />
+  if (action.includes('Minted')) return <Zap size={12} className="mr-2 text-blue-600" />
+  if (action.includes('Transferred')) return <Send size={12} className="mr-2 text-purple-600" />
+  if (action.includes('merging')) return <Activity size={12} className="mr-2 text-orange-600" />
+  if (action.includes('Special metadata')) return <Palette size={12} className="mr-2 text-pink-600" />
+  return <Activity size={12} className="mr-2 text-gray-600" />
 }
 
 export function NFTDetail({ nft, onGrow, onShrink }: NFTDetailProps) {
@@ -209,31 +220,42 @@ export function NFTDetail({ nft, onGrow, onShrink }: NFTDetailProps) {
               </div>
             </div>
 
+            {/* 🔥 ELITE ACTION HISTORY DISPLAY */}
             <div className="border border-black md:col-span-2">
-              <div className="border-b border-black p-2 bg-gray-100">
-                <div className="uppercase font-bold">ACTIONS HISTORY</div>
+              <div className="border-b border-black p-2 bg-gray-100 flex justify-between items-center">
+                <div className="uppercase font-bold">ON-CHAIN ACTION HISTORY</div>
+                <div className="text-xs text-gray-600">
+                  {nft.history?.length || 0} events
+                </div>
               </div>
-              <div className="p-3 max-h-40 overflow-y-auto">
+              <div className="p-3 max-h-80 overflow-y-auto">
                 {nft.history && nft.history.length > 0 ? (
-                  <div className="divide-y divide-gray-200">
-                    {nft.history.map((event, index) => (
-                      <div key={index} className="py-2 flex justify-between">
-                        <div className="flex items-center">
-                          {event.action === "grow" ? (
-                            <ArrowUp size={12} className="mr-1" />
-                          ) : (
-                            <ArrowDown size={12} className="mr-1" />
-                          )}
-                          <span className="capitalize">{event.action}</span>
+                  <div className="space-y-2">
+                    {/* 🎯 REVERSE ORDER: Most recent first */}
+                    {[...nft.history].reverse().map((event, index) => (
+                      <div 
+                        key={index} 
+                        className="flex items-start justify-between p-2 bg-gray-50 border border-gray-200 rounded text-sm hover:bg-gray-100 transition-colors"
+                      >
+                        <div className="flex items-start flex-1">
+                          {getActionIcon(event.action)}
+                          <div className="flex-1">
+                            <div className="font-medium text-gray-900">{event.action}</div>
+                          </div>
                         </div>
-                        <div className="text-[10px] text-gray-500">
-                          {new Date(event.timestamp * 1000).toLocaleString()}
+                        <div className="text-xs text-gray-500 ml-4 text-right">
+                          <div>{new Date(event.timestamp * 1000).toLocaleDateString()}</div>
+                          <div className="text-[10px]">{new Date(event.timestamp * 1000).toLocaleTimeString()}</div>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="text-center text-gray-500 py-4">No action history available</div>
+                  <div className="text-center text-gray-500 py-8">
+                    <Activity size={24} className="mx-auto mb-2 opacity-50" />
+                    <div className="font-medium">No action history available</div>
+                    <div className="text-xs">This circle hasn't performed any actions yet</div>
+                  </div>
                 )}
               </div>
             </div>
