@@ -149,6 +149,28 @@ yarn-error.log*
 *.swo
 *~
 
+# Cursor IDE
+.cursor/
+.cursor-tutor/
+.cursorrules
+.cursorignore
+cursor.log
+
+# JetBrains IDEs
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+*.swp
+*.swo
+.netrwhist
+
 # OS
 .DS_Store
 .DS_Store?
@@ -176,6 +198,9 @@ pids
 *.key
 *.pem
 wallet.json
+private-keys.txt
+mnemonic.txt
+.env.secret
 
 # Build tools
 .turbo
@@ -189,3 +214,14 @@ storybook-static
 # Temporary folders
 tmp/
 temp/
+
+# Package managers
+.pnpm-store/
+.yarn/
+.npm/
+
+# Temporary and cache files
+*.tmp
+*.temp
+.tmp/
+.temp/
