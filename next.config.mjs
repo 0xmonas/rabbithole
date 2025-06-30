@@ -32,9 +32,10 @@ const securityHeaders = [
     value: [
       "default-src 'self'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Web3 requires unsafe-eval for wallet connections
-      "style-src 'self' 'unsafe-inline'", // Charts require inline styles
+      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", // Allow Google Fonts
+      "font-src 'self' https://fonts.gstatic.com", // Allow Google Fonts
       "img-src 'self' data: blob:", // Allow data URLs for SVG images from contracts
-      "connect-src 'self' https://*.shape.network https://*.walletconnect.org wss://*.walletconnect.org",
+      "connect-src 'self' https://*.shape.network https://*.walletconnect.org wss://*.walletconnect.org https://api.web3modal.org", // Allow Web3Modal API
       "frame-src 'none'",
     ].join('; ')
   }
