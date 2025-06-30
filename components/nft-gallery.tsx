@@ -3,6 +3,7 @@
 import { useState } from "react"
 import type { NFT } from "@/types/nft"
 import { cn } from "@/lib/utils"
+import { OpenSeaRedirect } from "@/components/opensea-redirect"
 
 interface NFTGalleryProps {
   nfts: NFT[]
@@ -44,8 +45,8 @@ export function NFTGallery({
 
   if (nfts.length === 0) {
     return (
-      <div className="p-4 text-center">
-        <p className="text-gray-500">No circles found in your wallet.</p>
+      <div className="p-2">
+        <OpenSeaRedirect />
       </div>
     )
   }

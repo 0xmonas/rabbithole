@@ -177,8 +177,6 @@ function RabbitHoleAppInner() {
             </div>
             <p className="mt-4 text-gray-500">Loading your circles...</p>
           </div>
-        ) : nfts.length === 0 ? (
-          <OpenSeaRedirect large />
         ) : (
           <div className="border border-black rounded-sm overflow-hidden">
             <div className="flex flex-col h-[calc(100vh-12rem)] md:h-[calc(100vh-16rem)]">
