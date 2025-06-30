@@ -90,14 +90,14 @@ async function fetchTokenHistory(tokenId: number): Promise<{ action: string; tim
         })
       } else if (log.args.to.toLowerCase() === GARDEN_CONTRACT_ADDRESS.toLowerCase()) {
         history.push({
-          action: `🌱 Planted in Garden (${log.args.from.slice(0, 6)}...${log.args.from.slice(-4)} → Garden)`,
+          action: `Planted in Garden`,
           timestamp: Number(block.timestamp),
           blockNumber: Number(log.blockNumber),
           txHash: log.transactionHash
         })
       } else if (log.args.from.toLowerCase() === GARDEN_CONTRACT_ADDRESS.toLowerCase()) {
         history.push({
-          action: `🌳 Uprooted from Garden (Garden → ${log.args.to.slice(0, 6)}...${log.args.to.slice(-4)})`,
+          action: `Uprooted from Garden`,
           timestamp: Number(block.timestamp),
           blockNumber: Number(log.blockNumber),
           txHash: log.transactionHash
@@ -133,7 +133,7 @@ async function fetchTokenHistory(tokenId: number): Promise<{ action: string; tim
       for (const log of relevantGrowLogs) {
         const block = await publicClient!.getBlock({ blockNumber: log.blockNumber })
         history.push({
-          action: `📈 Grown to size ${log.args.newSize}`,
+          action: `Grown to size ${log.args.newSize}`,
           timestamp: Number(block.timestamp),
           blockNumber: Number(log.blockNumber),
           txHash: log.transactionHash
@@ -164,7 +164,7 @@ async function fetchTokenHistory(tokenId: number): Promise<{ action: string; tim
       for (const log of relevantShrinkLogs) {
         const block = await publicClient!.getBlock({ blockNumber: log.blockNumber })
         history.push({
-          action: `📉 Shrunk to size ${log.args.newSize}`,
+          action: `Shrunk to size ${log.args.newSize}`,
           timestamp: Number(block.timestamp),
           blockNumber: Number(log.blockNumber),
           txHash: log.transactionHash
@@ -190,12 +190,12 @@ async function fetchTokenHistory(tokenId: number): Promise<{ action: string; tim
       for (const log of mergedLogs as any[]) {
         if (log.args.mergedTokenIds.includes(BigInt(tokenId))) {
           const block = await publicClient!.getBlock({ blockNumber: log.blockNumber })
-          history.push({
-            action: `🔄 Merged with other tokens → Token #${log.args.newTokenId}`,
-            timestamp: Number(block.timestamp),
-            blockNumber: Number(log.blockNumber),
-            txHash: log.transactionHash
-          })
+                      history.push({
+              action: `Merged with other tokens → Token #${log.args.newTokenId}`,
+              timestamp: Number(block.timestamp),
+              blockNumber: Number(log.blockNumber),
+              txHash: log.transactionHash
+            })
         }
       }
     } catch (error) {
@@ -223,7 +223,7 @@ async function fetchTokenHistory(tokenId: number): Promise<{ action: string; tim
       for (const log of relevantMetadataLogs) {
         const block = await publicClient!.getBlock({ blockNumber: log.blockNumber })
         history.push({
-          action: `🎨 Special metadata set (1/1 status)`,
+          action: `Special metadata set (1/1 status)`,
           timestamp: Number(block.timestamp),
           blockNumber: Number(log.blockNumber),
           txHash: log.transactionHash
