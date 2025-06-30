@@ -22,6 +22,7 @@ function RabbitHoleAppInner() {
   const [activeSection, setActiveSection] = useState("GALLERY")
   const [mergeMode, setMergeMode] = useState(false)
   const [showNetworkModal, setShowNetworkModal] = useState(false)
+  const [selectedNFTsForMerge, setSelectedNFTsForMerge] = useState<number[]>([])
 
   // Calculate network status
   const isCorrectNetwork = chainId === shapeChain.id
@@ -63,6 +64,23 @@ function RabbitHoleAppInner() {
     { id: "MERGE", name: "MERGE [S0.3]" },
     { id: "ABOUT", name: "ABOUT [S0.4]" },
   ]
+
+  // Toggle NFT selection for merge
+  const toggleNFTForMerge = (id: number) => {
+    if (selectedNFTsForMerge.includes(id)) {
+      setSelectedNFTsForMerge(selectedNFTsForMerge.filter((nftId) => nftId !== id))
+    } else {
+      setSelectedNFTsForMerge([...selectedNFTsForMerge, id])
+    }
+  }
+
+  // Clear merge selection when exiting merge mode
+  const handleToggleMergeMode = () => {
+    setMergeMode(!mergeMode)
+    if (mergeMode) {
+      setSelectedNFTsForMerge([]) // Clear selection when exiting merge mode
+    }
+  }
 
   // Network status indicator
   const NetworkStatus = () => (
@@ -174,7 +192,10 @@ function RabbitHoleAppInner() {
                       }`}
                       onClick={() => {
                         setActiveSection(section.id)
-                        if (section.id !== "MERGE") setMergeMode(false)
+                        if (section.id !== "MERGE") {
+                          setMergeMode(false)
+                          setSelectedNFTsForMerge([]) // Clear selection when leaving merge
+                        }
                       }}
                     >
                       {section.name}
@@ -194,6 +215,8 @@ function RabbitHoleAppInner() {
                       selectedNFT={selectedNFT}
                       onSelectNFT={setSelectedNFT}
                       mergeMode={mergeMode}
+                      selectedNFTsForMerge={selectedNFTsForMerge}
+                      onToggleNFTForMerge={toggleNFTForMerge}
                     />
                   </div>
                 </div>
@@ -214,8 +237,9 @@ function RabbitHoleAppInner() {
                     <MergePanel
                       nfts={nfts}
                       onMergeComplete={refreshNFTs}
-                      onToggleMergeMode={() => setMergeMode(!mergeMode)}
+                      onToggleMergeMode={handleToggleMergeMode}
                       mergeMode={mergeMode}
+                      selectedNFTsForMerge={selectedNFTsForMerge}
                     />
                   )}
 

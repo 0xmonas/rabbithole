@@ -51,12 +51,12 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
 }
 
 // 🎯 ELITE FUNCTION: Fetch comprehensive action history for a token
-async function fetchTokenHistory(tokenId: number): Promise<{ action: string; timestamp: number }[]> {
+async function fetchTokenHistory(tokenId: number): Promise<{ action: string; timestamp: number; txHash: string }[]> {
   console.log(`🔍 Fetching action history for token #${tokenId}`)
   
   try {
     const publicClient = getPublicClient(wagmiConfig)
-    const history: { action: string; timestamp: number; blockNumber: number }[] = []
+    const history: { action: string; timestamp: number; blockNumber: number; txHash: string }[] = []
 
     // 📊 1. Fetch Transfer events (Mint, Transfers)
     const transferLogs = await withTimeout(
@@ -74,15 +74,17 @@ async function fetchTokenHistory(tokenId: number): Promise<{ action: string; tim
       const block = await publicClient!.getBlock({ blockNumber: log.blockNumber })
       if (log.args.from === '0x0000000000000000000000000000000000000000') {
         history.push({
-          action: `🎯 Minted to ${log.args.to.slice(0, 6)}...${log.args.to.slice(-4)}`,
+          action: `Minted to ${log.args.to.slice(0, 6)}...${log.args.to.slice(-4)}`,
           timestamp: Number(block.timestamp),
-          blockNumber: Number(log.blockNumber)
+          blockNumber: Number(log.blockNumber),
+          txHash: log.transactionHash
         })
       } else {
         history.push({
-          action: `📤 Transferred from ${log.args.from.slice(0, 6)}...${log.args.from.slice(-4)} to ${log.args.to.slice(0, 6)}...${log.args.to.slice(-4)}`,
+          action: `Transferred from ${log.args.from.slice(0, 6)}...${log.args.from.slice(-4)} to ${log.args.to.slice(0, 6)}...${log.args.to.slice(-4)}`,
           timestamp: Number(block.timestamp),
-          blockNumber: Number(log.blockNumber)
+          blockNumber: Number(log.blockNumber),
+          txHash: log.transactionHash
         })
       }
     }
@@ -102,9 +104,10 @@ async function fetchTokenHistory(tokenId: number): Promise<{ action: string; tim
     for (const log of grownLogs as any[]) {
       const block = await publicClient!.getBlock({ blockNumber: log.blockNumber })
       history.push({
-        action: `📈 Grown to size ${log.args.newSize}`,
+        action: `Grown to size ${log.args.newSize}`,
         timestamp: Number(block.timestamp),
-        blockNumber: Number(log.blockNumber)
+        blockNumber: Number(log.blockNumber),
+        txHash: log.transactionHash
       })
     }
 
@@ -123,9 +126,10 @@ async function fetchTokenHistory(tokenId: number): Promise<{ action: string; tim
     for (const log of shrunkLogs as any[]) {
       const block = await publicClient!.getBlock({ blockNumber: log.blockNumber })
       history.push({
-        action: `📉 Shrunk to size ${log.args.newSize}`,
+        action: `Shrunk to size ${log.args.newSize}`,
         timestamp: Number(block.timestamp),
-        blockNumber: Number(log.blockNumber)
+        blockNumber: Number(log.blockNumber),
+        txHash: log.transactionHash
       })
     }
 
@@ -148,15 +152,17 @@ async function fetchTokenHistory(tokenId: number): Promise<{ action: string; tim
         
         if (Number(log.args.newTokenId) === tokenId) {
           history.push({
-            action: `🔄 Created by merging tokens [${mergedIds}]`,
+            action: `Created by merging tokens [${mergedIds}]`,
             timestamp: Number(block.timestamp),
-            blockNumber: Number(log.blockNumber)
+            blockNumber: Number(log.blockNumber),
+            txHash: log.transactionHash
           })
         } else {
           history.push({
-            action: `🔄 Created as remainder from merging tokens [${mergedIds}]`,
+            action: `Created as remainder from merging tokens [${mergedIds}]`,
             timestamp: Number(block.timestamp),
-            blockNumber: Number(log.blockNumber)
+            blockNumber: Number(log.blockNumber),
+            txHash: log.transactionHash
           })
         }
       }
@@ -177,16 +183,17 @@ async function fetchTokenHistory(tokenId: number): Promise<{ action: string; tim
     for (const log of metadataLogs as any[]) {
       const block = await publicClient!.getBlock({ blockNumber: log.blockNumber })
       history.push({
-        action: `🎨 Special metadata set (1/1 status achieved)`,
+        action: `Special metadata set (1/1 status achieved)`,
         timestamp: Number(block.timestamp),
-        blockNumber: Number(log.blockNumber)
+        blockNumber: Number(log.blockNumber),
+        txHash: log.transactionHash
       })
     }
 
     // 🔥 ELITE SORTING: Sort by block number then timestamp
     const sortedHistory = history
       .sort((a, b) => a.blockNumber - b.blockNumber || a.timestamp - b.timestamp)
-      .map(({ action, timestamp }) => ({ action, timestamp }))
+      .map(({ action, timestamp, txHash }) => ({ action, timestamp, txHash }))
 
     console.log(`📋 Token #${tokenId} history: ${sortedHistory.length} actions`)
     return sortedHistory
@@ -235,7 +242,7 @@ export function useNFTs(address: string | null) {
           lastGrowTime === 0 ? 0 : growTimeElapsed >= DAILY_COOLDOWN ? 0 : DAILY_COOLDOWN - growTimeElapsed,
         shrinkCooldownRemaining:
           lastShrinkTime === 0 ? 0 : shrinkTimeElapsed >= DAILY_COOLDOWN ? 0 : DAILY_COOLDOWN - shrinkTimeElapsed,
-        history: history, // 🎯 REAL ACTION HISTORY!
+        history: history, // 🎯 REAL ACTION HISTORY with transaction hashes!
       }
     } catch (error) {
       console.error(`💥 Error fetching data for token ${tokenId}:`, error)

@@ -10,18 +10,19 @@ interface NFTGalleryProps {
   selectedNFT: number | null
   onSelectNFT: (id: number) => void
   mergeMode: boolean
+  selectedNFTsForMerge?: number[]
+  onToggleNFTForMerge?: (id: number) => void
 }
 
-export function NFTGallery({ nfts, loading, selectedNFT, onSelectNFT, mergeMode }: NFTGalleryProps) {
-  const [selectedForMerge, setSelectedForMerge] = useState<number[]>([])
-
-  const toggleNFTForMerge = (id: number) => {
-    if (selectedForMerge.includes(id)) {
-      setSelectedForMerge(selectedForMerge.filter((nftId) => nftId !== id))
-    } else {
-      setSelectedForMerge([...selectedForMerge, id])
-    }
-  }
+export function NFTGallery({ 
+  nfts, 
+  loading, 
+  selectedNFT, 
+  onSelectNFT, 
+  mergeMode,
+  selectedNFTsForMerge = [],
+  onToggleNFTForMerge 
+}: NFTGalleryProps) {
 
   if (loading) {
     return (
@@ -57,11 +58,11 @@ export function NFTGallery({ nfts, loading, selectedNFT, onSelectNFT, mergeMode 
           className={cn(
             "p-3 cursor-pointer hover:bg-gray-100",
             selectedNFT === nft.id && !mergeMode ? "bg-gray-100" : "",
-            selectedForMerge.includes(nft.id) && mergeMode ? "bg-gray-200" : "",
+            selectedNFTsForMerge.includes(nft.id) && mergeMode ? "bg-gray-200" : "",
           )}
           onClick={() => {
-            if (mergeMode) {
-              toggleNFTForMerge(nft.id)
+            if (mergeMode && onToggleNFTForMerge) {
+              onToggleNFTForMerge(nft.id)
             } else {
               onSelectNFT(nft.id)
             }
@@ -87,10 +88,10 @@ export function NFTGallery({ nfts, loading, selectedNFT, onSelectNFT, mergeMode 
                 <div
                   className={cn(
                     "absolute -top-1 -right-1 w-4 h-4 border border-black",
-                    selectedForMerge.includes(nft.id) ? "bg-black" : "bg-white",
+                    selectedNFTsForMerge.includes(nft.id) ? "bg-black" : "bg-white",
                   )}
                 >
-                  {selectedForMerge.includes(nft.id) && (
+                  {selectedNFTsForMerge.includes(nft.id) && (
                     <div className="text-white text-[8px] flex items-center justify-center h-full">✓</div>
                   )}
                 </div>

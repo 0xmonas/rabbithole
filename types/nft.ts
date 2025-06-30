@@ -10,6 +10,7 @@ export interface NFT {
   history?: {
     action: string
     timestamp: number
+    txHash: string
   }[]
 }
 

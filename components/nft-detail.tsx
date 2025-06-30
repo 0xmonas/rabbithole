@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import type { NFT } from "@/types/nft"
-import { ArrowUp, ArrowDown, Clock, Activity, Send, Zap, Palette } from "lucide-react"
+import { ArrowUp, ArrowDown, Clock, Activity, Send, Zap, Palette, ExternalLink } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { useNFTActions } from "@/hooks/use-nft-actions"
 
@@ -12,15 +12,20 @@ interface NFTDetailProps {
   onShrink: () => void
 }
 
-// 🎯 ELITE UI: Action icons mapping
+// 🎯 ELITE UI: Action icons mapping with consistent colors
 const getActionIcon = (action: string) => {
-  if (action.includes('Grown')) return <ArrowUp size={12} className="mr-2 text-green-600" />
-  if (action.includes('Shrunk')) return <ArrowDown size={12} className="mr-2 text-red-600" />
-  if (action.includes('Minted')) return <Zap size={12} className="mr-2 text-blue-600" />
-  if (action.includes('Transferred')) return <Send size={12} className="mr-2 text-purple-600" />
-  if (action.includes('merging')) return <Activity size={12} className="mr-2 text-orange-600" />
-  if (action.includes('Special metadata')) return <Palette size={12} className="mr-2 text-pink-600" />
-  return <Activity size={12} className="mr-2 text-gray-600" />
+  if (action.includes('Grown')) return <ArrowUp size={12} className="mr-2 text-black" />
+  if (action.includes('Shrunk')) return <ArrowDown size={12} className="mr-2 text-black" />
+  if (action.includes('Minted')) return <Zap size={12} className="mr-2 text-black" />
+  if (action.includes('Transferred')) return <Send size={12} className="mr-2 text-black" />
+  if (action.includes('merging')) return <Activity size={12} className="mr-2 text-black" />
+  if (action.includes('Special metadata')) return <Palette size={12} className="mr-2 text-black" />
+  return <Activity size={12} className="mr-2 text-black" />
+}
+
+// 🔗 ShapeScan transaction link
+const getShapeScanUrl = (txHash: string) => {
+  return `https://shapescan.xyz/tx/${txHash}`
 }
 
 export function NFTDetail({ nft, onGrow, onShrink }: NFTDetailProps) {
@@ -220,7 +225,7 @@ export function NFTDetail({ nft, onGrow, onShrink }: NFTDetailProps) {
               </div>
             </div>
 
-            {/* 🔥 ELITE ACTION HISTORY DISPLAY */}
+            {/* 🔥 ELITE ACTION HISTORY DISPLAY with ShapeScan Links */}
             <div className="border border-black md:col-span-2">
               <div className="border-b border-black p-2 bg-gray-100 flex justify-between items-center">
                 <div className="uppercase font-bold">ON-CHAIN ACTION HISTORY</div>
@@ -235,17 +240,29 @@ export function NFTDetail({ nft, onGrow, onShrink }: NFTDetailProps) {
                     {[...nft.history].reverse().map((event, index) => (
                       <div 
                         key={index} 
-                        className="flex items-start justify-between p-2 bg-gray-50 border border-gray-200 rounded text-sm hover:bg-gray-100 transition-colors"
+                        className="flex items-start justify-between p-2 border border-gray-200 rounded hover:bg-gray-50 transition-colors group"
                       >
                         <div className="flex items-start flex-1">
                           {getActionIcon(event.action)}
                           <div className="flex-1">
-                            <div className="font-medium text-gray-900">{event.action}</div>
+                            <div className="text-sm text-gray-900">{event.action}</div>
                           </div>
                         </div>
-                        <div className="text-xs text-gray-500 ml-4 text-right">
-                          <div>{new Date(event.timestamp * 1000).toLocaleDateString()}</div>
-                          <div className="text-[10px]">{new Date(event.timestamp * 1000).toLocaleTimeString()}</div>
+                        <div className="flex items-center ml-4 space-x-2">
+                          <div className="text-xs text-gray-500 text-right">
+                            <div>{new Date(event.timestamp * 1000).toLocaleDateString()}</div>
+                            <div className="text-[10px]">{new Date(event.timestamp * 1000).toLocaleTimeString()}</div>
+                          </div>
+                          {/* 🔗 ShapeScan Link */}
+                          <a 
+                            href={getShapeScanUrl(event.txHash)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-gray-200 rounded"
+                            title="View on ShapeScan"
+                          >
+                            <ExternalLink size={12} className="text-gray-600 hover:text-black" />
+                          </a>
                         </div>
                       </div>
                     ))}

@@ -10,21 +10,27 @@ interface MergePanelProps {
   onMergeComplete: () => void
   onToggleMergeMode: () => void
   mergeMode: boolean
+  selectedNFTsForMerge: number[]  // 🔥 Shared merge selection from parent
 }
 
-export function MergePanel({ nfts, onMergeComplete, onToggleMergeMode, mergeMode }: MergePanelProps) {
-  const [selectedNFTs, setSelectedNFTs] = useState<number[]>([])
+export function MergePanel({ 
+  nfts, 
+  onMergeComplete, 
+  onToggleMergeMode, 
+  mergeMode,
+  selectedNFTsForMerge 
+}: MergePanelProps) {
   const [mergePreview, setMergePreview] = useState<{ size: number; remainder: number }>({ size: 0, remainder: 0 })
   const { mergeNFTs, isActionPending, actionError } = useNFTActions()
 
   // Calculate the merge preview whenever selected NFTs change
   useEffect(() => {
-    if (selectedNFTs.length === 0) {
+    if (selectedNFTsForMerge.length === 0) {
       setMergePreview({ size: 0, remainder: 0 })
       return
     }
 
-    const selectedNFTObjects = nfts.filter((nft) => selectedNFTs.includes(nft.id))
+    const selectedNFTObjects = nfts.filter((nft) => selectedNFTsForMerge.includes(nft.id))
     const totalSize = selectedNFTObjects.reduce((sum, nft) => sum + nft.size, 0)
     const maxSize = 1000 // From the contract
 
@@ -39,21 +45,12 @@ export function MergePanel({ nfts, onMergeComplete, onToggleMergeMode, mergeMode
         remainder: 0,
       })
     }
-  }, [selectedNFTs, nfts])
-
-  const handleSelectNFT = (id: number) => {
-    if (selectedNFTs.includes(id)) {
-      setSelectedNFTs(selectedNFTs.filter((nftId) => nftId !== id))
-    } else {
-      setSelectedNFTs([...selectedNFTs, id])
-    }
-  }
+  }, [selectedNFTsForMerge, nfts])
 
   const handleMerge = async () => {
-    if (selectedNFTs.length < 2) return
+    if (selectedNFTsForMerge.length < 2) return
 
-    await mergeNFTs(selectedNFTs)
-    setSelectedNFTs([])
+    await mergeNFTs(selectedNFTsForMerge)
     onMergeComplete()
   }
 
@@ -93,13 +90,13 @@ export function MergePanel({ nfts, onMergeComplete, onToggleMergeMode, mergeMode
                 <div className="uppercase font-bold">SELECTED CIRCLES</div>
               </div>
               <div className="p-3">
-                {selectedNFTs.length === 0 ? (
+                {selectedNFTsForMerge.length === 0 ? (
                   <div className="text-center text-gray-500 py-4">
                     No circles selected. Select at least 2 circles to merge.
                   </div>
                 ) : (
                   <div className="grid grid-cols-2 gap-2">
-                    {selectedNFTs.map((id) => {
+                    {selectedNFTsForMerge.map((id) => {
                       const nft = nfts.find((n) => n.id === id)
                       if (!nft) return null
 
@@ -120,12 +117,6 @@ export function MergePanel({ nfts, onMergeComplete, onToggleMergeMode, mergeMode
                               <div className="text-[8px]">Size: {nft.size}</div>
                             </div>
                           </div>
-                          <button
-                            onClick={() => handleSelectNFT(id)}
-                            className="text-[10px] border border-black px-1 hover:bg-gray-100"
-                          >
-                            X
-                          </button>
                         </div>
                       )
                     })}
@@ -142,7 +133,7 @@ export function MergePanel({ nfts, onMergeComplete, onToggleMergeMode, mergeMode
                 <div className="mb-4">
                   <div className="text-[10px] text-gray-500 mb-1">TOTAL SIZE</div>
                   <div className="text-xl font-bold">
-                    {selectedNFTs.reduce((sum, id) => {
+                    {selectedNFTsForMerge.reduce((sum, id) => {
                       const nft = nfts.find((n) => n.id === id)
                       return sum + (nft?.size || 0)
                     }, 0)}
@@ -164,10 +155,10 @@ export function MergePanel({ nfts, onMergeComplete, onToggleMergeMode, mergeMode
                 <div className="mt-6">
                   <button
                     onClick={handleMerge}
-                    disabled={selectedNFTs.length < 2 || isActionPending}
+                    disabled={selectedNFTsForMerge.length < 2 || isActionPending}
                     className={cn(
                       "w-full border border-black px-4 py-2",
-                      selectedNFTs.length >= 2 && !isActionPending
+                      selectedNFTsForMerge.length >= 2 && !isActionPending
                         ? "bg-black text-white hover:bg-gray-800"
                         : "bg-gray-200 text-gray-500 cursor-not-allowed",
                     )}
@@ -190,7 +181,7 @@ export function MergePanel({ nfts, onMergeComplete, onToggleMergeMode, mergeMode
                 <div>
                   <div className="text-center mb-2 font-bold">SELECTED CIRCLES</div>
                   <div className="flex flex-wrap gap-2 justify-center">
-                    {selectedNFTs.map((id) => {
+                    {selectedNFTsForMerge.map((id) => {
                       const nft = nfts.find((n) => n.id === id)
                       if (!nft) return null
 
@@ -215,7 +206,7 @@ export function MergePanel({ nfts, onMergeComplete, onToggleMergeMode, mergeMode
                   </div>
                 </div>
 
-                {selectedNFTs.length >= 2 && (
+                {selectedNFTsForMerge.length >= 2 && (
                   <>
                     <div className="text-2xl font-bold">=</div>
                     <div>
