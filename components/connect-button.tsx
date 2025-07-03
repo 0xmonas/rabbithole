@@ -19,7 +19,7 @@ export function ConnectButton({ large = false }: ConnectButtonProps) {
       // Open Reown AppKit modal for wallet selection
       await appKit.open()
     } catch (error) {
-      console.error("Connection error:", error)
+      logger.error("Connection error:", error)
     } finally {
       setIsConnecting(false)
     }

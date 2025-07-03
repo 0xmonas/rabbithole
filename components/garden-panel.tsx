@@ -11,6 +11,7 @@ import { Sprout, ArrowUpFromLine, ArrowDownToLine, Zap, Clock, Leaf, Shield, Shi
 import { readContract } from "@wagmi/core"
 import { wagmiConfig } from "@/config/wagmi"
 import { getAddress } from "viem"
+import { logger } from "@/lib/logger"
 
 interface GardenPanelProps {
   address: string | null
@@ -87,9 +88,9 @@ export function GardenPanel({ address, userNFTs, onRefreshUserNFTs }: GardenPane
         lastChecked: Date.now()
       })
       
-      console.log(`🔒 Approval status for ${address}: ${isApproved}`)
+      logger.debug(`🔒 Approval status for ${address}: ${isApproved}`)
     } catch (error) {
-      console.error("❌ Error checking approval status:", error)
+      logger.error("❌ Error checking approval status:", error)
       setApprovalInfo(prev => ({ 
         ...prev, 
         isChecking: false,
@@ -114,7 +115,7 @@ export function GardenPanel({ address, userNFTs, onRefreshUserNFTs }: GardenPane
         checkApprovalStatus()
       }, 2000)
     } catch (error) {
-      console.error("❌ Plant seeds failed:", error)
+      logger.error("❌ Plant seeds failed:", error)
       // Refresh approval status in case it changed during failed attempt
       checkApprovalStatus()
     }
@@ -128,11 +129,11 @@ export function GardenPanel({ address, userNFTs, onRefreshUserNFTs }: GardenPane
     // 🔥 GAS OPTIMIZATION: Let the hook determine optimal range
     // 👤 WALLET VALIDATION: Ensure wallet is connected
     if (!address) {
-      console.error("❌ Cannot work garden: No wallet connected")
+      logger.error("❌ Cannot work garden: No wallet connected")
       return
     }
     
-    console.log(`🌍 Working garden from address: ${address}`)
+    logger.debug(`🌍 Working garden from address: ${address}`)
     await workGarden() // No parameter = smart optimization
   }
 

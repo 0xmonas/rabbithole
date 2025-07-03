@@ -5,6 +5,7 @@ import { switchChain, getAccount } from "@wagmi/core"
 import { wagmiConfig, shapeChain } from "@/config/wagmi"
 import { X } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { logger } from "@/lib/logger"
 
 interface NetworkSwitchModalProps {
   isOpen: boolean
@@ -50,18 +51,18 @@ export function NetworkSwitchModal({ isOpen, onClose, currentChainId }: NetworkS
         throw new Error("No wallet connected")
       }
 
-      console.log("Switching to Shape network (Chain ID: 360)...")
+      logger.debug("Switching to Shape network (Chain ID: 360)...")
       
       // Use the new Wagmi v2 switchChain API directly
       await switchChain(wagmiConfig, { 
         chainId: shapeChain.id 
       })
       
-      console.log("Successfully switched to Shape network")
+      logger.debug("Successfully switched to Shape network")
       onClose()
       
     } catch (switchError: any) {
-      console.error("Network switch error:", switchError)
+      logger.error("Network switch error:", switchError)
       
       // Handle specific error codes
       if (switchError.code === 4902 || switchError.message?.includes('Unrecognized chain')) {
@@ -86,14 +87,14 @@ export function NetworkSwitchModal({ isOpen, onClose, currentChainId }: NetworkS
             
             // Try switching again after adding
             await switchChain(wagmiConfig, { chainId: shapeChain.id })
-            console.log("Successfully added and switched to Shape network")
+            logger.debug("Successfully added and switched to Shape network")
             onClose()
             
           } else {
             setError("Unable to add network. Please add Shape network manually in your wallet.")
           }
         } catch (addError: any) {
-            console.error("Error adding network:", addError)
+            logger.error("Error adding network:", addError)
           setError(`Failed to add Shape network: ${addError.message || 'Please add the network manually in your wallet.'}`)
           }
       } else if (switchError.code === 4001) {

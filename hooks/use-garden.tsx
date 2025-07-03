@@ -129,10 +129,10 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
       logger.debug("PublicClient status", { available: !!publicClient })
       
       // 🔍 DETAILED TRANSFER ANALYSIS - Let's see ALL transfers involving this address
-      console.log("🔍 ANALYZING ALL TRANSFERS FOR ADDRESS:", address)
+      logger.debug("ANALYZING ALL TRANSFERS FOR ADDRESS:", address)
       
       // Get ALL transfers FROM this address (what they sent out)
-      console.log("🔍 Querying ALL transfers FROM user...")
+      logger.debug("Querying ALL transfers FROM user...")
       const allTransfersFromUser = await withTimeout(
         publicClient!.getLogs({
           address: RH_CONTRACT_ADDRESS,
@@ -146,13 +146,15 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
         15000
       )
       
-      console.log(`🔍 Found ${allTransfersFromUser.length} transfers FROM user:`)
-      allTransfersFromUser.forEach((log: any, index) => {
-        console.log(`🔍   ${index + 1}. Token #${Number(log.args.tokenId)} sent to: ${log.args.to}`)
-      })
+      logger.debug(`Found ${allTransfersFromUser.length} transfers FROM user`)
+      if (logger) {
+        allTransfersFromUser.forEach((log: any, index) => {
+          logger.debug(`Token #${Number(log.args.tokenId)} sent to: ${log.args.to}`)
+        })
+      }
       
       // Get ALL transfers TO this address (what they received)
-      console.log("🔍 Querying ALL transfers TO user...")
+      logger.debug("Querying ALL transfers TO user...")
       const allTransfersToUser = await withTimeout(
         publicClient!.getLogs({
           address: RH_CONTRACT_ADDRESS,
@@ -166,23 +168,25 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
         15000
       )
       
-      console.log(`🔍 Found ${allTransfersToUser.length} transfers TO user:`)
-      allTransfersToUser.forEach((log: any, index) => {
-        console.log(`🔍   ${index + 1}. Token #${Number(log.args.tokenId)} received from: ${log.args.from}`)
-      })
+      logger.debug(`Found ${allTransfersToUser.length} transfers TO user`)
+      if (logger) {
+        allTransfersToUser.forEach((log: any, index) => {
+          logger.debug(`Token #${Number(log.args.tokenId)} received from: ${log.args.from}`)
+        })
+      }
       
       // Calculate net token ownership
       const tokensReceived = new Set(allTransfersToUser.map((log: any) => Number(log.args.tokenId)))
       const tokensSent = new Set(allTransfersFromUser.map((log: any) => Number(log.args.tokenId)))
       const currentTokens = Array.from(tokensReceived).filter(tokenId => !tokensSent.has(tokenId))
       
-      console.log(`🔍 OWNERSHIP ANALYSIS:`)
-      console.log(`🔍   Tokens received: [${Array.from(tokensReceived).join(", ")}]`)
-      console.log(`🔍   Tokens sent: [${Array.from(tokensSent).join(", ")}]`)
-      console.log(`🔍   Should currently own: [${currentTokens.join(", ")}]`)
+      logger.debug("OWNERSHIP ANALYSIS:")
+      logger.debug(`Tokens received: [${Array.from(tokensReceived).join(", ")}]`)
+      logger.debug(`Tokens sent: [${Array.from(tokensSent).join(", ")}]`)
+      logger.debug(`Should currently own: [${currentTokens.join(", ")}]`)
       
       // Now focus on garden-specific transfers
-      console.log("🌱 Querying transfers TO garden...")
+      logger.debug("Querying transfers TO garden...")
       const transfersToGarden = await withTimeout(
         publicClient!.getLogs({
           address: RH_CONTRACT_ADDRESS,
@@ -197,10 +201,10 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
         10000
       )
       
-      console.log(`🌱 Found ${(transfersToGarden as any[]).length} transfers TO garden:`, transfersToGarden)
+      logger.debug(`Found ${(transfersToGarden as any[]).length} transfers TO garden`, transfersToGarden)
 
       // Get transfers FROM garden contract to user (uproot events)
-      console.log("🌱 Querying transfers FROM garden...")
+      logger.debug("Querying transfers FROM garden...")
       const transfersFromGarden = await withTimeout(
         publicClient!.getLogs({
           address: RH_CONTRACT_ADDRESS,
@@ -215,7 +219,7 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
         10000
       )
       
-      console.log(`🌱 Found ${(transfersFromGarden as any[]).length} transfers FROM garden:`, transfersFromGarden)
+      logger.debug(`Found ${(transfersFromGarden as any[]).length} transfers FROM garden`, transfersFromGarden)
 
       // Calculate currently planted tokens - FIXED LOGIC
       // Count net transfers for each token (how many times planted vs uprooted)
@@ -227,7 +231,7 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
         const counts = tokenTransferCounts.get(tokenId) || { planted: 0, uprooted: 0 }
         counts.planted++
         tokenTransferCounts.set(tokenId, counts)
-        console.log(`🌱 Token planted: #${tokenId} (count: ${counts.planted})`)
+        logger.debug(`🌱 Token planted: #${tokenId} (count: ${counts.planted})`)
       })
       
       // Count all uproot transfers  
@@ -236,34 +240,34 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
         const counts = tokenTransferCounts.get(tokenId) || { planted: 0, uprooted: 0 }
         counts.uprooted++
         tokenTransferCounts.set(tokenId, counts)
-        console.log(`🌱 Token uprooted: #${tokenId} (count: ${counts.uprooted})`)
+        logger.debug(`🌱 Token uprooted: #${tokenId} (count: ${counts.uprooted})`)
       })
       
       // Determine currently planted tokens (net positive garden transfers)
       const currentlyPlanted: number[] = []
       tokenTransferCounts.forEach((counts, tokenId) => {
         const netInGarden = counts.planted - counts.uprooted
-        console.log(`🌱 Token #${tokenId}: ${counts.planted} planted - ${counts.uprooted} uprooted = ${netInGarden} net`)
+        logger.debug(`🌱 Token #${tokenId}: ${counts.planted} planted - ${counts.uprooted} uprooted = ${netInGarden} net`)
         if (netInGarden > 0) {
           currentlyPlanted.push(tokenId)
         }
       })
 
-      console.log(`🌱 ALL PLANTED TOKENS: [${Array.from(tokenTransferCounts.keys()).join(", ")}]`)
-      console.log(`🌱 CURRENTLY PLANTED: [${currentlyPlanted.join(", ")}]`)
+      logger.debug(`🌱 ALL PLANTED TOKENS: [${Array.from(tokenTransferCounts.keys()).join(", ")}]`)
+      logger.debug(`🌱 CURRENTLY PLANTED: [${currentlyPlanted.join(", ")}]`)
 
       if (currentlyPlanted.length === 0) {
-        console.log("🌱 No currently planted tokens found")
+        logger.debug("🌱 No currently planted tokens found")
         setGardenNFTs([])
         setLoading(false)
         return
       }
 
       // Fetch NFT data for planted tokens
-      console.log(`🌱 Fetching data for ${currentlyPlanted.length} planted tokens...`)
+      logger.debug(`🌱 Fetching data for ${currentlyPlanted.length} planted tokens...`)
       const nftPromises = currentlyPlanted.map(async (tokenId) => {
         try {
-          console.log(`🌱 Checking owner of token #${tokenId}...`)
+          logger.debug(`🌱 Checking owner of token #${tokenId}...`)
           
           // Verify token is actually in garden
           const owner = await withTimeout(
@@ -276,16 +280,16 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
             5000
           ) as string
 
-          console.log(`🌱 Token #${tokenId} owner: ${owner}`)
-          console.log(`🌱 Garden contract: ${GARDEN_CONTRACT_ADDRESS}`)
-          console.log(`🌱 Owner matches garden: ${owner.toLowerCase() === GARDEN_CONTRACT_ADDRESS.toLowerCase()}`)
+          logger.debug(`🌱 Token #${tokenId} owner: ${owner}`)
+          logger.debug(`🌱 Garden contract: ${GARDEN_CONTRACT_ADDRESS}`)
+          logger.debug(`🌱 Owner matches garden: ${owner.toLowerCase() === GARDEN_CONTRACT_ADDRESS.toLowerCase()}`)
 
           if (owner.toLowerCase() !== GARDEN_CONTRACT_ADDRESS.toLowerCase()) {
-            console.log(`🌱 Token #${tokenId} not in garden anymore (owner: ${owner})`)
+            logger.debug(`🌱 Token #${tokenId} not in garden anymore (owner: ${owner})`)
             return null // Token not in garden anymore
           }
 
-          console.log(`🌱 Fetching circle data for token #${tokenId}...`)
+          logger.debug(`🌱 Fetching circle data for token #${tokenId}...`)
           
           // Get circle data
           const tokenInfo = await withTimeout(
@@ -319,14 +323,14 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
               
               if (metadata.image) {
                 imageUrl = metadata.image
-                console.log(`🌱 Token #${tokenId} image extracted from contract`)
+                logger.debug(`🌱 Token #${tokenId} image extracted from contract`)
               }
             }
           } catch (error) {
-            console.warn(`⚠️ Could not fetch garden image for token #${tokenId}:`, error)
+            logger.warn(`⚠️ Could not fetch garden image for token #${tokenId}:`, error)
           }
 
-          console.log(`🌱 Token #${tokenId} data:`, {
+          logger.debug(`🌱 Token #${tokenId} data:`, {
             size: Number((tokenInfo as any)[0]),
             lastGrowTime: Number((tokenInfo as any)[1]),
             lastShrinkTime: Number((tokenInfo as any)[2])
@@ -351,7 +355,7 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
             history: [], // Garden history can be added later
           } as NFT
         } catch (error) {
-          console.error(`💥 Error fetching garden token ${tokenId}:`, error)
+          logger.error(`💥 Error fetching garden token ${tokenId}:`, error)
           return null
         }
       })
@@ -359,11 +363,11 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
       const nftResults = await Promise.all(nftPromises)
       const validNFTs = nftResults.filter((nft): nft is NFT => nft !== null)
 
-      console.log(`🌱 Successfully loaded ${validNFTs.length} garden NFTs:`, validNFTs.map(nft => `#${nft.id} (size: ${nft.size})`))
+      logger.debug(`🌱 Successfully loaded ${validNFTs.length} garden NFTs:`, validNFTs.map(nft => `#${nft.id} (size: ${nft.size})`))
       setGardenNFTs(validNFTs)
 
     } catch (error) {
-      console.error("💥 Error fetching garden NFTs:", error)
+      logger.error("💥 Error fetching garden NFTs:", error)
       setGardenNFTs([])
     } finally {
       setLoading(false)
@@ -378,10 +382,10 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
 
     // 🔥 GAS OPTIMIZATION: Default to 1000 instead of 10,000
     // RabbitHole collection has 1000 NFTs max, so this is sufficient
-    console.log(`🔥 Plant Seeds Gas Optimization: Using maxTokenId=${maxTokenId}`)
+    logger.debug(`🔥 Plant Seeds Gas Optimization: Using maxTokenId=${maxTokenId}`)
     
     // 🔒 APPROVAL HANDLING: Check if garden contract is approved to handle user's tokens
-    console.log("🔒 Checking approval status for garden contract...")
+    logger.debug("🔒 Checking approval status for garden contract...")
     
     try {
       const isApproved = await readContract(wagmiConfig, {
@@ -391,11 +395,11 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
         args: [address as `0x${string}`, GARDEN_CONTRACT_ADDRESS],
       }) as boolean
 
-      console.log(`🔒 Garden contract approval status: ${isApproved}`)
+      logger.debug(`🔒 Garden contract approval status: ${isApproved}`)
 
       // If not approved, request approval first
       if (!isApproved) {
-        console.log("🔒 Garden contract not approved. Requesting approval...")
+        logger.debug("🔒 Garden contract not approved. Requesting approval...")
         
         // Execute approval transaction
         await transactionModal.executeTransaction(
@@ -407,12 +411,12 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
               functionName: "setApprovalForAll",
               args: [GARDEN_CONTRACT_ADDRESS, true],
             })
-            console.log(`🔒 Approval transaction hash: ${hash}`)
+            logger.debug(`🔒 Approval transaction hash: ${hash}`)
             return hash
           }
         )
 
-        console.log("✅ Garden contract approved successfully!")
+        logger.debug("✅ Garden contract approved successfully!")
         
         // Verify approval was successful
         const isNowApproved = await readContract(wagmiConfig, {
@@ -426,7 +430,7 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
           throw new Error("Approval verification failed - garden contract is still not approved")
         }
       } else {
-        console.log("✅ Garden contract already approved")
+        logger.debug("✅ Garden contract already approved")
       }
 
       // Now plant the seeds
@@ -439,14 +443,14 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
             functionName: "plant_seeds",
             args: [BigInt(maxTokenId)],
           })
-          console.log(`🌱 Planting seeds with optimized range, transaction hash: ${hash}`)
+          logger.debug(`🌱 Planting seeds with optimized range, transaction hash: ${hash}`)
           return hash
         },
         onSuccess
       )
 
     } catch (error) {
-      console.error("💥 Error in plant seeds process:", error)
+      logger.error("💥 Error in plant seeds process:", error)
       throw error
     }
   }
@@ -462,7 +466,7 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
           functionName: "uproot",
           args: [],
         })
-        console.log(`🌱 Uprooting, transaction hash: ${hash}`)
+        logger.debug(`🌱 Uprooting, transaction hash: ${hash}`)
         return hash
       },
       onSuccess
@@ -480,10 +484,10 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
       optimizedMax = 1100 // Increased from 1000 to cover tokens like #1004, #1014
     }
     
-    console.log(`Work Garden Debug: Using maxTokenId=${optimizedMax} (covers tokens up to #1100)`)
-    console.log(`Current garden stats before work_garden:`)
-    console.log(`- Total tokens: ${gardenStats.totalGardenTokens}`)
-    console.log(`- Ready to grow: ${gardenStats.readyToGrowCount}`)
+    logger.debug(`Work Garden Debug: Using maxTokenId=${optimizedMax} (covers tokens up to #1100)`)
+    logger.debug(`Current garden stats before work_garden:`)
+    logger.debug(`- Total tokens: ${gardenStats.totalGardenTokens}`)
+    logger.debug(`- Ready to grow: ${gardenStats.readyToGrowCount}`)
     
     return await transactionModal.executeTransaction(
       `Working Garden (Max ID: ${optimizedMax})`,
@@ -494,8 +498,8 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
           functionName: "work_garden",
           args: [BigInt(optimizedMax)],
         })
-        console.log(`Work garden transaction completed: ${hash}`)
-        console.log(`Smart contract will check token IDs 0-${optimizedMax} and grow eligible tokens`)
+        logger.debug(`Work garden transaction completed: ${hash}`)
+        logger.debug(`Smart contract will check token IDs 0-${optimizedMax} and grow eligible tokens`)
         return hash
       },
       onSuccess
@@ -504,7 +508,7 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
 
   // 🌍 Fetch Garden-Wide Statistics (Community Service Data)
   const fetchGardenWideStats = async () => {
-    console.log("🌍 Fetching garden-wide statistics...")
+    logger.debug("🌍 Fetching garden-wide statistics...")
     setGardenStats(prev => ({ ...prev, loading: true }))
     setIsCommunityLoading(true)
 
@@ -567,7 +571,7 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
         }
       })
 
-      console.log(`🌍 Total tokens in garden: ${currentlyPlantedInGarden.length}`)
+      logger.debug(`🌍 Total tokens in garden: ${currentlyPlantedInGarden.length}`)
 
       // Fetch full data for all garden tokens in parallel
       const tokenDataPromises = currentlyPlantedInGarden.map(async (tokenId) => {
@@ -602,7 +606,7 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
             lastGrowTime: Number((tokenInfo as any)[1])
           }
         } catch (error) {
-          console.warn(`Could not check token #${tokenId} data for community view:`, error)
+          logger.warn(`Could not check token #${tokenId} data for community view:`, error)
           return null
         }
       })
@@ -700,7 +704,7 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
           }
         }
       } catch (error) {
-        console.warn("Could not fetch work_garden timing:", error)
+        logger.warn("Could not fetch work_garden timing:", error)
       }
 
       setGardenStats({
@@ -711,10 +715,10 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
         loading: false
       })
 
-      console.log(`🌍 Garden stats: ${currentlyPlantedInGarden.length} total, ${readyToGrowCount} ready to grow`)
+      logger.debug(`🌍 Garden stats: ${currentlyPlantedInGarden.length} total, ${readyToGrowCount} ready to grow`)
 
     } catch (error) {
-      console.error("💥 Error fetching garden-wide stats:", error)
+      logger.error("💥 Error fetching garden-wide stats:", error)
       setGardenStats(prev => ({ ...prev, loading: false }))
     } finally {
       setIsCommunityLoading(false)

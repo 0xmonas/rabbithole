@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { watchChainId, getAccount, watchAccount } from "@wagmi/core"
 import { wagmiConfig, shapeChain } from "@/config/wagmi"
+import { logger } from "@/lib/logger"
 
 export function useNetwork() {
   const [chainId, setChainId] = useState<number | undefined>(undefined)
@@ -10,10 +11,10 @@ export function useNetwork() {
   const [isLoading, setIsLoading] = useState(true)
 
   const updateNetworkState = (account: any) => {
-    console.log("Network update - Account:", account)
+    logger.debug("Network update - Account:", account)
     
     if (account.status !== "connected") {
-      console.log("Account not connected, clearing network state")
+      logger.debug("Account not connected, clearing network state")
           setChainId(undefined)
           setIsCorrectNetwork(false)
           setIsLoading(false)
@@ -21,7 +22,7 @@ export function useNetwork() {
         }
 
     const currentChainId = account.chainId
-    console.log("Network update - Chain ID:", currentChainId)
+    logger.debug("Network update - Chain ID:", currentChainId)
     
     setChainId(currentChainId)
     setIsCorrectNetwork(currentChainId === shapeChain.id)
@@ -41,7 +42,7 @@ export function useNetwork() {
     // Also watch chain changes separately for extra reliability
     const unwatchChain = watchChainId(wagmiConfig, {
       onChange: (newChainId) => {
-        console.log("Direct chain change to:", newChainId)
+        logger.debug("Direct chain change to:", newChainId)
         setChainId(newChainId)
         setIsCorrectNetwork(newChainId === shapeChain.id)
       },

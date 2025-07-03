@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from "react"
 import { getAccount, connect, disconnect, watchAccount } from "@wagmi/core"
 import { injected } from "@wagmi/connectors"
 import { wagmiConfig } from "@/config/wagmi"
+import { logger } from "@/lib/logger"
 
 export function useAccount() {
   const [address, setAddress] = useState<string | null>(null)
@@ -13,11 +14,11 @@ export function useAccount() {
   const updateAccountState = useCallback(() => {
     try {
       const account = getAccount(wagmiConfig)
-      console.log("Account state:", account)
+      logger.debug("Account state:", account)
       setAddress(account.address || null)
       setIsConnected(account.status === "connected")
     } catch (error) {
-      console.error("Error updating account state:", error)
+      logger.error("Error updating account state:", error)
       setAddress(null)
       setIsConnected(false)
     }
@@ -32,10 +33,10 @@ export function useAccount() {
         // No need to manually initialize connector
         const account = getAccount(wagmiConfig)  
         if (account.status === "disconnected" && window.ethereum) {
-          console.log("Wallet available but not connected")
+          logger.debug("Wallet available but not connected")
         }
       } catch (error) {
-        console.error("Error checking account:", error)
+        logger.error("Error checking account:", error)
       } finally {
         updateAccountState()
       }
@@ -46,7 +47,7 @@ export function useAccount() {
     // Subscribe to account changes
     const unwatch = watchAccount(wagmiConfig, {
       onChange: (account) => {
-        console.log("Account changed:", account)
+        logger.debug("Account changed:", account)
         setAddress(account.address || null)
         setIsConnected(account.status === "connected")
       },
@@ -60,14 +61,14 @@ export function useAccount() {
   // Connect wallet function
   const connectWallet = useCallback(async () => {
     try {
-      console.log("Connecting wallet...")
+      logger.debug("Connecting wallet...")
       await connect(wagmiConfig, {
         connector: injected(),
       })
       updateAccountState()
       return address
     } catch (error) {
-      console.error("Connection error:", error)
+      logger.error("Connection error:", error)
       return null
     }
   }, [address, updateAccountState])
@@ -75,11 +76,11 @@ export function useAccount() {
   // Disconnect wallet function
   const disconnectWallet = useCallback(async () => {
     try {
-      console.log("Disconnecting wallet...")
+      logger.debug("Disconnecting wallet...")
       await disconnect(wagmiConfig)
       updateAccountState()
     } catch (error) {
-      console.error("Disconnect error:", error)
+      logger.error("Disconnect error:", error)
     }
   }, [updateAccountState])
 
