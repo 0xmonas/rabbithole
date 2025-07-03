@@ -69,6 +69,20 @@ const rhAbi = [
     stateMutability: "view",
     type: "function",
   },
+  {
+    inputs: [{ internalType: "address", name: "owner", type: "address" }, { internalType: "address", name: "operator", type: "address" }],
+    name: "isApprovedForAll",
+    outputs: [{ internalType: "bool", name: "", type: "bool" }],
+    stateMutability: "view",
+    type: "function",
+  },
+  {
+    inputs: [{ internalType: "address", name: "operator", type: "address" }, { internalType: "bool", name: "approved", type: "bool" }],
+    name: "setApprovalForAll",
+    outputs: [],
+    stateMutability: "nonpayable",
+    type: "function",
+  },
 ] as const
 
 // Helper function with timeout
@@ -354,26 +368,85 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
     }
   }
 
-  // 🌱 Plant seeds (send NFTs to garden) - OPTIMIZED FOR GAS
+  // 🌱 Plant seeds (send NFTs to garden) - WITH APPROVAL HANDLING
   const plantSeeds = async (maxTokenId: number = 1000) => {
+    if (!address) {
+      throw new Error("No wallet connected")
+    }
+
     // 🔥 GAS OPTIMIZATION: Default to 1000 instead of 10,000
     // RabbitHole collection has 1000 NFTs max, so this is sufficient
     console.log(`🔥 Plant Seeds Gas Optimization: Using maxTokenId=${maxTokenId}`)
     
-    return await transactionModal.executeTransaction(
-      `Planting Seeds (Max ID: ${maxTokenId})`,
-      async () => {
-        const hash = await writeContract(wagmiConfig, {
-          address: GARDEN_CONTRACT_ADDRESS,
-          abi: gardenAbi,
-          functionName: "plant_seeds",
-          args: [BigInt(maxTokenId)],
-        })
-        console.log(`🌱 Planting seeds with optimized range, transaction hash: ${hash}`)
-        return hash
-      },
-      onSuccess
-    )
+    // 🔒 APPROVAL HANDLING: Check if garden contract is approved to handle user's tokens
+    console.log("🔒 Checking approval status for garden contract...")
+    
+    try {
+      const isApproved = await readContract(wagmiConfig, {
+        address: RH_CONTRACT_ADDRESS,
+        abi: rhAbi,
+        functionName: "isApprovedForAll",
+        args: [address as `0x${string}`, GARDEN_CONTRACT_ADDRESS],
+      }) as boolean
+
+      console.log(`🔒 Garden contract approval status: ${isApproved}`)
+
+      // If not approved, request approval first
+      if (!isApproved) {
+        console.log("🔒 Garden contract not approved. Requesting approval...")
+        
+        // Execute approval transaction
+        await transactionModal.executeTransaction(
+          "Approving Garden Contract",
+          async () => {
+            const hash = await writeContract(wagmiConfig, {
+              address: RH_CONTRACT_ADDRESS,
+              abi: rhAbi,
+              functionName: "setApprovalForAll",
+              args: [GARDEN_CONTRACT_ADDRESS, true],
+            })
+            console.log(`🔒 Approval transaction hash: ${hash}`)
+            return hash
+          }
+        )
+
+        console.log("✅ Garden contract approved successfully!")
+        
+        // Verify approval was successful
+        const isNowApproved = await readContract(wagmiConfig, {
+          address: RH_CONTRACT_ADDRESS,
+          abi: rhAbi,
+          functionName: "isApprovedForAll",
+          args: [address as `0x${string}`, GARDEN_CONTRACT_ADDRESS],
+        }) as boolean
+
+        if (!isNowApproved) {
+          throw new Error("Approval verification failed - garden contract is still not approved")
+        }
+      } else {
+        console.log("✅ Garden contract already approved")
+      }
+
+      // Now plant the seeds
+      return await transactionModal.executeTransaction(
+        `Planting Seeds (Max ID: ${maxTokenId})`,
+        async () => {
+          const hash = await writeContract(wagmiConfig, {
+            address: GARDEN_CONTRACT_ADDRESS,
+            abi: gardenAbi,
+            functionName: "plant_seeds",
+            args: [BigInt(maxTokenId)],
+          })
+          console.log(`🌱 Planting seeds with optimized range, transaction hash: ${hash}`)
+          return hash
+        },
+        onSuccess
+      )
+
+    } catch (error) {
+      console.error("💥 Error in plant seeds process:", error)
+      throw error
+    }
   }
 
   // 🌱 Uproot (get NFTs back from garden)

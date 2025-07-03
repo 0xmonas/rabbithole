@@ -1,12 +1,15 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import type { NFT } from "@/types/nft"
 import { cn } from "@/lib/utils"
 import { useGarden } from "@/hooks/use-garden"
 import { TransactionModal } from "@/components/transaction-modal"
 import { TokenImage } from "@/components/token-image"
-import { Sprout, ArrowUpFromLine, ArrowDownToLine, Zap, Clock, Leaf } from "lucide-react"
+import { Sprout, ArrowUpFromLine, ArrowDownToLine, Zap, Clock, Leaf, Shield, ShieldCheck } from "lucide-react"
+import { readContract } from "@wagmi/core"
+import { wagmiConfig } from "@/config/wagmi"
+import { getAddress } from "viem"
 
 interface GardenPanelProps {
   address: string | null
@@ -33,11 +36,85 @@ export function GardenPanel({ address, userNFTs, onRefreshUserNFTs }: GardenPane
   })
   
   const [selectedAction, setSelectedAction] = useState<"plant" | "uproot" | "work">("plant")
+  const [approvalInfo, setApprovalInfo] = useState<{
+    isChecking: boolean
+    isApproved: boolean | null
+    lastChecked: number
+  }>({
+    isChecking: false,
+    isApproved: null,
+    lastChecked: 0
+  })
+
+  // Contract addresses - must match garden hook
+  const RH_CONTRACT_ADDRESS = getAddress("0xca38813d69409e4e50f1411a0cab2570e570c75a")
+  const GARDEN_CONTRACT_ADDRESS = getAddress("0x2940574AF75D350BF37Ceb73CA5dE8e5ADA425c4")
+
+  // ABI for approval checking
+  const rhAbi = [
+    {
+      inputs: [{ internalType: "address", name: "owner", type: "address" }, { internalType: "address", name: "operator", type: "address" }],
+      name: "isApprovedForAll",
+      outputs: [{ internalType: "bool", name: "", type: "bool" }],
+      stateMutability: "view",
+      type: "function",
+    },
+  ] as const
+
+  // Check approval status
+  const checkApprovalStatus = async () => {
+    if (!address) {
+      setApprovalInfo(prev => ({ ...prev, isApproved: null }))
+      return
+    }
+
+    setApprovalInfo(prev => ({ ...prev, isChecking: true }))
+    
+    try {
+      const isApproved = await readContract(wagmiConfig, {
+        address: RH_CONTRACT_ADDRESS,
+        abi: rhAbi,
+        functionName: "isApprovedForAll",
+        args: [address as `0x${string}`, GARDEN_CONTRACT_ADDRESS],
+      }) as boolean
+
+      setApprovalInfo({
+        isChecking: false,
+        isApproved,
+        lastChecked: Date.now()
+      })
+      
+      console.log(`🔒 Approval status for ${address}: ${isApproved}`)
+    } catch (error) {
+      console.error("❌ Error checking approval status:", error)
+      setApprovalInfo(prev => ({ 
+        ...prev, 
+        isChecking: false,
+        isApproved: null 
+      }))
+    }
+  }
+
+  // Check approval status when address changes or when needed
+  useEffect(() => {
+    checkApprovalStatus()
+  }, [address])
 
   const handlePlantSeeds = async () => {
-    // GAS OPTIMIZATION: Use increased range to match work garden capability  
-    // Found tokens like #1004, #1014, so need to check beyond 1000
-    await plantSeeds(1100) // Increased from 1000 to 1100 to match work garden range
+    try {
+      // GAS OPTIMIZATION: Use increased range to match work garden capability  
+      // Found tokens like #1004, #1014, so need to check beyond 1000
+      await plantSeeds(1100) // Increased from 1000 to 1100 to match work garden range
+      
+      // Refresh approval status after planting (might have changed during approval process)
+      setTimeout(() => {
+        checkApprovalStatus()
+      }, 2000)
+    } catch (error) {
+      console.error("❌ Plant seeds failed:", error)
+      // Refresh approval status in case it changed during failed attempt
+      checkApprovalStatus()
+    }
   }
 
   const handleUproot = async () => {
@@ -135,6 +212,38 @@ export function GardenPanel({ address, userNFTs, onRefreshUserNFTs }: GardenPane
 
                 <div className="text-gray-500">Your Ready to Grow</div>
                 <div className="font-mono text-green-600">{readyToGrow}</div>
+                
+                <div className="text-gray-500 flex items-center justify-between">
+                  <span>Garden Approval</span>
+                  <button
+                    onClick={checkApprovalStatus}
+                    disabled={approvalInfo.isChecking}
+                    className="text-blue-600 hover:text-blue-800 underline text-xs disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Refresh approval status"
+                  >
+                    Refresh
+                  </button>
+                </div>
+                <div className="flex items-center">
+                  {approvalInfo.isChecking ? (
+                    <div className="flex items-center">
+                      <div className="w-3 h-3 bg-gray-300 animate-pulse mr-1"></div>
+                      <span className="text-xs text-gray-500">Checking...</span>
+                    </div>
+                  ) : approvalInfo.isApproved === true ? (
+                    <div className="flex items-center">
+                      <ShieldCheck size={12} className="text-green-600 mr-1" />
+                      <span className="text-xs text-green-600 font-medium">Approved</span>
+                    </div>
+                  ) : approvalInfo.isApproved === false ? (
+                    <div className="flex items-center">
+                      <Shield size={12} className="text-red-600 mr-1" />
+                      <span className="text-xs text-red-600 font-medium">Not Approved</span>
+                    </div>
+                  ) : (
+                    <span className="text-xs text-gray-400">Unknown</span>
+                  )}
+                </div>
               </div>
               
               {/* Garden Status Message */}
@@ -190,9 +299,17 @@ export function GardenPanel({ address, userNFTs, onRefreshUserNFTs }: GardenPane
                     ? "bg-green-500 text-white hover:bg-green-600"
                     : "bg-gray-200 text-gray-500 cursor-not-allowed"
                 )}
+                title={approvalInfo.isApproved === false 
+                  ? "Garden contract needs approval first (will request when clicked)" 
+                  : `Plant ${userNFTs.length} NFTs in the garden for automated growth`
+                }
               >
                 <ArrowDownToLine size={12} className="mr-2" />
-                PLANT ALL ({userNFTs.length})
+                {approvalInfo.isApproved === false ? (
+                  `APPROVE & PLANT (${userNFTs.length})`
+                ) : (
+                  `PLANT ALL (${userNFTs.length})`
+                )}
               </button>
 
               <button
