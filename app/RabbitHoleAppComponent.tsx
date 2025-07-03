@@ -202,10 +202,10 @@ function RabbitHoleAppInner() {
               <div className="flex border-b border-black">
                 <div className="border-r border-black p-2 w-64">YOUR CIRCLES</div>
                 <div className="flex-1 flex">
-                  {sections.map((section) => (
+                  {sections.map((section, index) => (
                     <div
                       key={section.id}
-                      className={`border-r border-black p-2 flex-1 text-center cursor-pointer ${
+                      className={`${index < sections.length - 1 ? 'border-r border-black' : ''} p-2 flex-1 text-center cursor-pointer ${
                         activeSection === section.id ? "bg-black text-white" : "hover:bg-gray-100"
                       }`}
                       onClick={() => {

@@ -105,6 +105,8 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
     nextWorkGardenTime: 0,
     loading: true
   })
+  const [communityTokens, setCommunityTokens] = useState<Array<{ id: number; size: number }>>([])
+  const [isCommunityLoading, setIsCommunityLoading] = useState(true)
   const transactionModal = useTransactionModal()
 
   // 🌱 Fetch Garden NFTs for user
@@ -504,6 +506,7 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
   const fetchGardenWideStats = async () => {
     console.log("🌍 Fetching garden-wide statistics...")
     setGardenStats(prev => ({ ...prev, loading: true }))
+    setIsCommunityLoading(true)
 
     try {
       const publicClient = getPublicClient(wagmiConfig)
@@ -566,14 +569,9 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
 
       console.log(`🌍 Total tokens in garden: ${currentlyPlantedInGarden.length}`)
 
-      // Check which tokens are ready to grow (24h cooldown passed)
-      let readyToGrowCount = 0
-      const now = Math.floor(Date.now() / 1000)
-      const readyTokenDetails: Array<{id: number, lastGrowTime: number, timeElapsed: number}> = []
-      
-      for (const tokenId of currentlyPlantedInGarden) {
+      // Fetch full data for all garden tokens in parallel
+      const tokenDataPromises = currentlyPlantedInGarden.map(async (tokenId) => {
         try {
-          // Verify token is still in garden
           const owner = await withTimeout(
             readContract(wagmiConfig, {
               address: RH_CONTRACT_ADDRESS,
@@ -584,50 +582,53 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
             3000
           ) as string
 
-          if (owner.toLowerCase() === GARDEN_CONTRACT_ADDRESS.toLowerCase()) {
-            // Get circle data
-            const tokenInfo = await withTimeout(
-              readContract(wagmiConfig, {
-                address: RH_CONTRACT_ADDRESS,
-                abi: rhAbi,
-                functionName: "circleData",
-                args: [BigInt(tokenId)],
-              }),
-              3000
-            )
+          if (owner.toLowerCase() !== GARDEN_CONTRACT_ADDRESS.toLowerCase()) {
+            return null // No longer in garden
+          }
 
-            const lastGrowTime = Number((tokenInfo as any)[1])
-            const growTimeElapsed = now - lastGrowTime
-            
-            // If 24 hours have passed since last grow, it's ready
-            if (lastGrowTime === 0 || growTimeElapsed >= 86400) {
-              readyToGrowCount++
-              readyTokenDetails.push({
-                id: tokenId,
-                lastGrowTime,
-                timeElapsed: growTimeElapsed
-              })
-            }
+          const tokenInfo = await withTimeout(
+            readContract(wagmiConfig, {
+              address: RH_CONTRACT_ADDRESS,
+              abi: rhAbi,
+              functionName: "circleData",
+              args: [BigInt(tokenId)],
+            }),
+            3000
+          )
+          
+          return {
+            id: tokenId,
+            size: Number((tokenInfo as any)[0]),
+            lastGrowTime: Number((tokenInfo as any)[1])
           }
         } catch (error) {
-          console.warn(`Could not check token #${tokenId} readiness:`, error)
+          console.warn(`Could not check token #${tokenId} data for community view:`, error)
+          return null
         }
-      }
+      })
 
-      // DEBUG: Log details about ready tokens
-      console.log(`Garden Stats Debug:`)
-      console.log(`- Total tokens in garden: ${currentlyPlantedInGarden.length}`)
-      console.log(`- Ready to grow count: ${readyToGrowCount}`)
-      console.log(`- Ready token details:`, readyTokenDetails)
+      const allTokensData = (await Promise.all(tokenDataPromises)).filter((t): t is {id: number, size: number, lastGrowTime: number} => t !== null)
+
+      // Set community tokens for visualizer
+      setCommunityTokens(allTokensData.map(t => ({id: t.id, size: t.size})))
+
+      // Check which tokens are ready to grow (24h cooldown passed)
+      let readyToGrowCount = 0
+      const now = Math.floor(Date.now() / 1000)
+      const readyTokenDetails: Array<{id: number, lastGrowTime: number, timeElapsed: number}> = []
       
-      if (readyTokenDetails.length > 0) {
-        console.log(`Ready tokens that should be grown by work_garden:`)
-        readyTokenDetails.forEach(token => {
-          const hoursElapsed = Math.floor(token.timeElapsed / 3600)
-          console.log(`  - Token #${token.id}: ${hoursElapsed}h elapsed (lastGrowTime: ${token.lastGrowTime})`)
-        })
-      }
-
+      allTokensData.forEach(token => {
+        const growTimeElapsed = now - token.lastGrowTime
+        if (token.lastGrowTime === 0 || growTimeElapsed >= 86400) {
+          readyToGrowCount++
+          readyTokenDetails.push({
+            id: token.id,
+            lastGrowTime: token.lastGrowTime,
+            timeElapsed: growTimeElapsed
+          })
+        }
+      })
+      
       // Get last work_garden call time from transaction events
       // Look for work_garden transactions to the garden contract
       let lastWorkGardenTime = 0
@@ -715,6 +716,8 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
     } catch (error) {
       console.error("💥 Error fetching garden-wide stats:", error)
       setGardenStats(prev => ({ ...prev, loading: false }))
+    } finally {
+      setIsCommunityLoading(false)
     }
   }
 
@@ -734,5 +737,7 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
     transactionModal,
     gardenStats,
     fetchGardenWideStats,
+    communityTokens,
+    isCommunityLoading,
   }
 } 

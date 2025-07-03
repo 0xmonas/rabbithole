@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils"
 import { useGarden } from "@/hooks/use-garden"
 import { TransactionModal } from "@/components/transaction-modal"
 import { TokenImage } from "@/components/token-image"
+import GardenCommunityVisualizer from "@/components/garden-community-visualizer"
 import { Sprout, ArrowUpFromLine, ArrowDownToLine, Zap, Clock, Leaf, Shield, ShieldCheck } from "lucide-react"
 import { readContract } from "@wagmi/core"
 import { wagmiConfig } from "@/config/wagmi"
@@ -27,7 +28,9 @@ export function GardenPanel({ address, userNFTs, onRefreshUserNFTs }: GardenPane
     refreshGarden, 
     transactionModal,
     gardenStats,
-    fetchGardenWideStats 
+    fetchGardenWideStats,
+    communityTokens,
+    isCommunityLoading,
   } = useGarden(address, async () => {
     // Refresh both garden and user NFTs after successful transaction
     await refreshGarden()
@@ -438,6 +441,14 @@ export function GardenPanel({ address, userNFTs, onRefreshUserNFTs }: GardenPane
               )}
             </div>
           </div>
+        </div>
+
+        {/* Community Garden Visualizer */}
+        <div className="mt-6">
+          <GardenCommunityVisualizer 
+            tokens={communityTokens} 
+            isLoading={isCommunityLoading} 
+          />
         </div>
 
         {/* Transaction Modal handles error display */}
