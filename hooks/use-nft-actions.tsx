@@ -91,4 +91,3 @@ export function useNFTActions(onSuccess?: () => void | Promise<void>) {
     transactionModal,
   }
 }
-

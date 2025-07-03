@@ -193,14 +193,88 @@ pids
 # Optional REPL history
 .node_repl_history
 
-# Web3 specific
+# Web3 & Blockchain Security - CRITICAL: Never commit these!
 .secrets
 *.key
 *.pem
+*.keystore
+*.p12
+*.pfx
 wallet.json
 private-keys.txt
 mnemonic.txt
+seed.txt
 .env.secret
+.env.keys
+.env.private
+
+# Wallet Files - All formats
+wallet/
+wallets/
+keystore/
+**/wallet.json
+**/keystore.json
+**/private.key
+**/mnemonic.txt
+**/seed-phrase.txt
+**/.secret
+**/.private
+**/.wallet
+
+# Smart Contract Development
+hardhat.config.js.backup
+truffle-config.js.backup
+foundry.toml.backup
+deployments/*/.*
+contracts/.env
+scripts/.env
+
+# Contract Deployment Artifacts (may contain sensitive info)
+.openzeppelin/
+artifacts/contracts/**/*.sol/*.json
+cache/
+typechain/
+typechain-types/
+
+# Network Configuration (RPC URLs, API keys)
+networks.json
+rpc.json
+infura.json
+alchemy.json
+quicknode.json
+
+# Testing & Development Accounts
+test-accounts.json
+dev-wallets.json
+account-*.json
+accounts.txt
+
+# API Keys & Service Credentials  
+.alchemy
+.infura
+.quicknode
+.moralis
+.thegraph
+.pinata
+.ipfs
+coinmarketcap.json
+etherscan.json
+polygonscan.json
+
+# Security Analysis
+slither-reports/
+mythril-reports/
+.slither.json
+
+# Docker secrets
+docker-compose.override.yml
+.dockerignore.secret
+
+# Backup files that might contain keys
+*.backup
+*.bak
+*~.lock
+*.orig
 
 # Build tools
 .turbo
