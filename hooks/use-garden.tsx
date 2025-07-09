@@ -375,13 +375,13 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
   }
 
   // 🌱 Plant seeds (send NFTs to garden) - WITH APPROVAL HANDLING
-  const plantSeeds = async (maxTokenId: number = 1000) => {
+  const plantSeeds = async (maxTokenId: number = 1100) => {
     if (!address) {
       throw new Error("No wallet connected")
     }
 
-    // 🔥 GAS OPTIMIZATION: Default to 1000 instead of 10,000
-    // RabbitHole collection has 1000 NFTs max, so this is sufficient
+    // 🔥 GAS OPTIMIZATION: Default to 1100 to cover merged tokens (like #1004, #1014)
+    // RabbitHole collection has merged tokens beyond 1000, so need 1100 range
     logger.debug(`🔥 Plant Seeds Gas Optimization: Using maxTokenId=${maxTokenId}`)
     
     // 🔒 APPROVAL HANDLING: Check if garden contract is approved to handle user's tokens
