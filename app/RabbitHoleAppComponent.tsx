@@ -10,6 +10,7 @@ import { GardenPanel } from "@/components/garden-panel"
 import { StatsPanel } from "@/components/stats-panel"
 import { OpenSeaRedirect } from "@/components/opensea-redirect"
 import { NetworkSwitchModal } from "@/components/network-switch-modal"
+import { LeaderboardPanel } from "@/components/leaderboard-panel"
 import { useAccount, useChainId } from "wagmi"
 import { useNFTs } from "@/hooks/use-nfts"
 import { shapeChain } from "@/config/wagmi"
@@ -79,6 +80,7 @@ function RabbitHoleAppInner() {
     { id: "MERGE", name: "MERGE [S0.3]" },
     { id: "GARDEN", name: "GARDEN [S0.4]" },
     { id: "ABOUT", name: "ABOUT [S0.5]" },
+    { id: "LEADERBOARD", name: "LEADERBOARD [S0.6]" },
   ]
 
   // Toggle NFT selection for merge
@@ -499,6 +501,12 @@ function RabbitHoleAppInner() {
                           </div>
                         </div>
                       </div>
+                    </div>
+                  )}
+
+                  {activeSection === "LEADERBOARD" && (
+                    <div className="flex-1 overflow-y-auto">
+                      <LeaderboardPanel address={address || null} />
                     </div>
                   )}
                 </div>
