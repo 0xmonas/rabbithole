@@ -389,25 +389,70 @@ export function useNFTs(address: string | null) {
 
       logger.debug(`Found ${(transferOutLogs as any[]).length} Transfer events FROM this address`)
 
-      // Calculate current owned tokens
-      const tokensReceived = new Set((transferLogs as any[]).map((log: any) => Number(log.args.tokenId)))
-      const tokensSent = new Set((transferOutLogs as any[]).map((log: any) => Number(log.args.tokenId)))
-      
+      const addressLower = address.toLowerCase()
+
       // ✅ FIXED: Garden transfers need special handling
       // Don't count garden transfers as "sent away" - they're temporary deposits
-      const nonGardenTransferOutLogs = (transferOutLogs as any[]).filter((log: any) => 
+      const nonGardenTransferOutLogs = (transferOutLogs as any[]).filter((log: any) =>
         log.args.to.toLowerCase() !== GARDEN_CONTRACT_ADDRESS.toLowerCase()
       )
-      const actualTokensSent = new Set(nonGardenTransferOutLogs.map((log: any) => Number(log.args.tokenId)))
-      
-      // Current owned = received - actually sent (excluding garden deposits)
-      const ownedTokenIds = Array.from(tokensReceived).filter(tokenId => !actualTokensSent.has(tokenId))
-      
-      logger.debug(`Currently owns ${ownedTokenIds.length} tokens`, { 
-        received: Array.from(tokensReceived), 
-        sentToGarden: Array.from(tokensSent).filter(id => !actualTokensSent.has(id)),
-        actuallySent: Array.from(actualTokensSent),
-        owned: ownedTokenIds 
+
+      type TransferEvent = {
+        tokenId: number
+        direction: "in" | "out"
+        blockNumber: bigint
+        logIndex: number
+      }
+
+      const transferEvents: TransferEvent[] = []
+
+      // Track inbound transfers first
+      ;(transferLogs as any[]).forEach((log: any) => {
+        transferEvents.push({
+          tokenId: Number(log.args.tokenId),
+          direction: "in",
+          blockNumber: log.blockNumber,
+          logIndex: Number(log.logIndex ?? 0)
+        })
+      })
+
+      // Track outbound transfers (excluding self-transfers and garden deposits)
+      ;(nonGardenTransferOutLogs as any[]).forEach((log: any) => {
+        const toAddress = log.args.to?.toLowerCase?.() || ""
+        if (toAddress === addressLower) {
+          // Self-transfer – no net change in ownership
+          return
+        }
+
+        transferEvents.push({
+          tokenId: Number(log.args.tokenId),
+          direction: "out",
+          blockNumber: log.blockNumber,
+          logIndex: Number(log.logIndex ?? 0)
+        })
+      })
+
+      // Sort by block number then log index to replay history in order
+      transferEvents.sort((a, b) => {
+        const blockDiff = Number(a.blockNumber) - Number(b.blockNumber)
+        if (blockDiff !== 0) return blockDiff
+        return a.logIndex - b.logIndex
+      })
+
+      const ownedTokenSet = new Set<number>()
+      transferEvents.forEach(event => {
+        if (event.direction === "in") {
+          ownedTokenSet.add(event.tokenId)
+        } else {
+          ownedTokenSet.delete(event.tokenId)
+        }
+      })
+
+      const ownedTokenIds = Array.from(ownedTokenSet).sort((a, b) => a - b)
+
+      logger.debug(`Currently owns ${ownedTokenIds.length} tokens`, {
+        transferEventCount: transferEvents.length,
+        owned: ownedTokenIds
       })
 
       if (ownedTokenIds.length === 0) {
@@ -448,4 +493,3 @@ export function useNFTs(address: string | null) {
 
   return { nfts, isLoading, error, refreshNFTs: fetchAllNFTs }
 }
-
