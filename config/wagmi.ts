@@ -5,6 +5,8 @@ import { createAppKit } from '@reown/appkit'
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
 import { logger } from "@/lib/logger"
 
+const RPC_PROXY_URL = "/api/rpc"
+
 // Define Shape L2 chain
 export const shapeChain = defineChain({
   id: 360,
@@ -16,10 +18,10 @@ export const shapeChain = defineChain({
   },
   rpcUrls: {
     default: {
-      http: [process.env.NEXT_PUBLIC_RPC_URL || "https://mainnet.shape.network"],
+      http: [RPC_PROXY_URL],
     },
     public: {
-      http: [process.env.NEXT_PUBLIC_RPC_URL || "https://mainnet.shape.network"],
+      http: [RPC_PROXY_URL],
     },
   },
   blockExplorers: {
@@ -41,7 +43,7 @@ const wagmiAdapter = new WagmiAdapter({
   networks: [shapeChain],
   projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'dummy-project-id-no-api', // Safe dummy ID
   transports: {
-    [shapeChain.id]: http(process.env.NEXT_PUBLIC_RPC_URL || "https://mainnet.shape.network"),
+    [shapeChain.id]: http(RPC_PROXY_URL),
   },
 })
 
@@ -76,4 +78,3 @@ logger.debug("Contract address:", CONTRACT_ADDRESS)
 logger.debug("Project ID configured", { 
   hasProjectId: !!process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID 
 })
-

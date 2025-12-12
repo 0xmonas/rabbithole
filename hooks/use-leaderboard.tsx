@@ -1,10 +1,10 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { readContract, getPublicClient } from "@wagmi/core"
+import { readContract } from "@wagmi/core"
 import { wagmiConfig, CONTRACT_ADDRESS } from "@/config/wagmi"
-import { parseAbiItem } from "viem"
 import { logger } from "@/lib/logger"
+import { fetchAlchemyTransfers } from "@/lib/alchemy-transfers"
 
 // Leaderboard types
 export interface LeaderboardUser {
@@ -124,31 +124,25 @@ export function useLeaderboard(currentUserAddress?: string | null) {
     logger.info("🏆 Starting professional leaderboard data fetching")
     
     const userTokens = new Map<string, Array<{ id: number; size: number; location: 'wallet' | 'garden' }>>()
-    const publicClient = getPublicClient(wagmiConfig)
     
     // Step 1: Get ALL Transfer events for the entire collection (following useNFTs pattern)
     logger.info("📊 Fetching all Transfer events for ownership mapping...")
     
-    const allTransferLogs = await withTimeout(
-      publicClient!.getLogs({
-        address: CONTRACT_ADDRESS,
-        event: parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)'),
-        fromBlock: BigInt(0),
-        toBlock: 'latest'
-      }),
-      20000 // 20 seconds for all transfers
-    )
+    const allTransferLogs = await fetchAlchemyTransfers({
+      contractAddress: CONTRACT_ADDRESS,
+    })
     
-    logger.debug(`Found ${(allTransferLogs as any[]).length} total Transfer events`)
+    logger.debug(`Found ${allTransferLogs.length} total Transfer events`)
     
     // Step 2: Process ownership for each token (1-1000)
     const tokenOwnership = new Map<number, { owner: string; location: 'wallet' | 'garden' }>()
     
     // Process all transfers to determine current owners
-    for (const log of allTransferLogs as any[]) {
-      const tokenId = Number(log.args.tokenId)
-      const from = log.args.from.toLowerCase()
-      const to = log.args.to.toLowerCase()
+    for (const transfer of allTransferLogs) {
+      if (transfer.tokenId === null) continue
+      const tokenId = transfer.tokenId
+      const from = (transfer.from || "0x0000000000000000000000000000000000000000").toLowerCase()
+      const to = (transfer.to || "0x0000000000000000000000000000000000000000").toLowerCase()
       const gardenAddress = GARDEN_CONTRACT_ADDRESS.toLowerCase()
       
       // Determine location and owner

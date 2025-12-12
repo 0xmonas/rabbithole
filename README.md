@@ -42,7 +42,10 @@ Create `.env.local` with:
 # WalletConnect Project ID (required for wallet connections)
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id_here
 
-# Optional: Custom RPC endpoint
+# Server-only Alchemy RPC key (kept secret)
+ALCHEMY_RPC_URL=https://shape-mainnet.g.alchemy.com/v2/your-key
+
+# Optional: Fallback public RPC endpoint
 NEXT_PUBLIC_SHAPE_RPC_URL=https://mainnet.shape.network
 
 # Optional: Analytics
@@ -62,6 +65,7 @@ VERCEL_ANALYTICS_ID=
 
 2. **Set Environment Variables** in Vercel dashboard:
    - `NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID`
+   - `ALCHEMY_RPC_URL`
    - Other optional variables as needed
 
 3. **Custom Domain** (optional):

@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { readContract, writeContract, getPublicClient } from "@wagmi/core"
+import { readContract, writeContract } from "@wagmi/core"
 import { wagmiConfig } from "@/config/wagmi"
-import { parseAbiItem, getAddress } from "viem"
+import { getAddress } from "viem"
 import type { NFT } from "@/types/nft"
 import { useTransactionModal } from "./use-transaction-modal"
 import { logger } from "@/lib/logger"
+import { fetchAlchemyTransfers } from "@/lib/alchemy-transfers"
 
 // Garden contract address and ABI - FIXED CHECKSUM
 const GARDEN_CONTRACT_ADDRESS = getAddress("0x2940574AF75D350BF37Ceb73CA5dE8e5ADA425c4")
@@ -95,6 +96,8 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   ])
 }
 
+const isValidTokenId = (value: number | null): value is number => typeof value === "number" && !Number.isNaN(value)
+
 export function useGarden(address: string | null, onSuccess?: () => void | Promise<void>) {
   const [gardenNFTs, setGardenNFTs] = useState<NFT[]>([])
   const [loading, setLoading] = useState(false)
@@ -124,60 +127,41 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
     setLoading(true)
 
     try {
-      // Get user's planted seeds using Transfer events
-      const publicClient = getPublicClient(wagmiConfig)
-      logger.debug("PublicClient status", { available: !!publicClient })
-      
-      // 🔍 DETAILED TRANSFER ANALYSIS - Let's see ALL transfers involving this address
-      logger.debug("ANALYZING ALL TRANSFERS FOR ADDRESS:", address)
-      
       // Get ALL transfers FROM this address (what they sent out)
       logger.debug("Querying ALL transfers FROM user...")
-      const allTransfersFromUser = await withTimeout(
-        publicClient!.getLogs({
-          address: RH_CONTRACT_ADDRESS,
-          event: parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)'),
-          args: {
-            from: address as `0x${string}`,
-          },
-          fromBlock: BigInt(0),
-          toBlock: 'latest'
-        }),
-        15000
-      )
+      const allTransfersFromUser = await fetchAlchemyTransfers({
+        contractAddress: RH_CONTRACT_ADDRESS,
+        fromAddress: address as `0x${string}`,
+      })
       
       logger.debug(`Found ${allTransfersFromUser.length} transfers FROM user`)
-      if (logger) {
-        allTransfersFromUser.forEach((log: any, index) => {
-          logger.debug(`Token #${Number(log.args.tokenId)} sent to: ${log.args.to}`)
-        })
-      }
+      allTransfersFromUser.forEach((transfer) => {
+        if (isValidTokenId(transfer.tokenId)) {
+          logger.debug(`Token #${transfer.tokenId} sent to: ${transfer.to}`)
+        }
+      })
       
       // Get ALL transfers TO this address (what they received)
       logger.debug("Querying ALL transfers TO user...")
-      const allTransfersToUser = await withTimeout(
-        publicClient!.getLogs({
-          address: RH_CONTRACT_ADDRESS,
-          event: parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)'),
-          args: {
-            to: address as `0x${string}`,
-          },
-          fromBlock: BigInt(0),
-          toBlock: 'latest'
-        }),
-        15000
-      )
+      const allTransfersToUser = await fetchAlchemyTransfers({
+        contractAddress: RH_CONTRACT_ADDRESS,
+        toAddress: address as `0x${string}`,
+      })
       
       logger.debug(`Found ${allTransfersToUser.length} transfers TO user`)
-      if (logger) {
-        allTransfersToUser.forEach((log: any, index) => {
-          logger.debug(`Token #${Number(log.args.tokenId)} received from: ${log.args.from}`)
-        })
-      }
+      allTransfersToUser.forEach((transfer) => {
+        if (isValidTokenId(transfer.tokenId)) {
+          logger.debug(`Token #${transfer.tokenId} received from: ${transfer.from}`)
+        }
+      })
       
       // Calculate net token ownership
-      const tokensReceived = new Set(allTransfersToUser.map((log: any) => Number(log.args.tokenId)))
-      const tokensSent = new Set(allTransfersFromUser.map((log: any) => Number(log.args.tokenId)))
+      const tokensReceived = new Set(
+        allTransfersToUser.map((transfer) => transfer.tokenId).filter(isValidTokenId)
+      )
+      const tokensSent = new Set(
+        allTransfersFromUser.map((transfer) => transfer.tokenId).filter(isValidTokenId)
+      )
       const currentTokens = Array.from(tokensReceived).filter(tokenId => !tokensSent.has(tokenId))
       
       logger.debug("OWNERSHIP ANALYSIS:")
@@ -187,47 +171,32 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
       
       // Now focus on garden-specific transfers
       logger.debug("Querying transfers TO garden...")
-      const transfersToGarden = await withTimeout(
-        publicClient!.getLogs({
-          address: RH_CONTRACT_ADDRESS,
-          event: parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)'),
-          args: {
-            from: address as `0x${string}`,
-            to: GARDEN_CONTRACT_ADDRESS,
-          },
-          fromBlock: BigInt(0),
-          toBlock: 'latest'
-        }),
-        10000
-      )
+      const transfersToGarden = await fetchAlchemyTransfers({
+        contractAddress: RH_CONTRACT_ADDRESS,
+        fromAddress: address as `0x${string}`,
+        toAddress: GARDEN_CONTRACT_ADDRESS,
+      })
       
-      logger.debug(`Found ${(transfersToGarden as any[]).length} transfers TO garden`, transfersToGarden)
+      logger.debug(`Found ${transfersToGarden.length} transfers TO garden`)
 
       // Get transfers FROM garden contract to user (uproot events)
       logger.debug("Querying transfers FROM garden...")
-      const transfersFromGarden = await withTimeout(
-        publicClient!.getLogs({
-          address: RH_CONTRACT_ADDRESS,
-          event: parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)'),
-          args: {
-            from: GARDEN_CONTRACT_ADDRESS,
-            to: address as `0x${string}`,
-          },
-          fromBlock: BigInt(0),
-          toBlock: 'latest'
-        }),
-        10000
-      )
+      const transfersFromGarden = await fetchAlchemyTransfers({
+        contractAddress: RH_CONTRACT_ADDRESS,
+        fromAddress: GARDEN_CONTRACT_ADDRESS,
+        toAddress: address as `0x${string}`,
+      })
       
-      logger.debug(`Found ${(transfersFromGarden as any[]).length} transfers FROM garden`, transfersFromGarden)
+      logger.debug(`Found ${transfersFromGarden.length} transfers FROM garden`)
 
       // Calculate currently planted tokens - FIXED LOGIC
       // Count net transfers for each token (how many times planted vs uprooted)
       const tokenTransferCounts = new Map<number, { planted: number, uprooted: number }>()
       
       // Count all plant transfers
-      ;(transfersToGarden as any[]).forEach((log: any) => {
-        const tokenId = Number(log.args.tokenId)
+      transfersToGarden.forEach((transfer) => {
+        if (!isValidTokenId(transfer.tokenId)) return
+        const tokenId = transfer.tokenId
         const counts = tokenTransferCounts.get(tokenId) || { planted: 0, uprooted: 0 }
         counts.planted++
         tokenTransferCounts.set(tokenId, counts)
@@ -235,8 +204,9 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
       })
       
       // Count all uproot transfers  
-      ;(transfersFromGarden as any[]).forEach((log: any) => {
-        const tokenId = Number(log.args.tokenId)
+      transfersFromGarden.forEach((transfer) => {
+        if (!isValidTokenId(transfer.tokenId)) return
+        const tokenId = transfer.tokenId
         const counts = tokenTransferCounts.get(tokenId) || { planted: 0, uprooted: 0 }
         counts.uprooted++
         tokenTransferCounts.set(tokenId, counts)
@@ -513,50 +483,34 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
     setIsCommunityLoading(true)
 
     try {
-      const publicClient = getPublicClient(wagmiConfig)
-      
       // Get ALL transfers TO garden (from anyone)
-      const allTransfersToGarden = await withTimeout(
-        publicClient!.getLogs({
-          address: RH_CONTRACT_ADDRESS,
-          event: parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)'),
-          args: {
-            to: GARDEN_CONTRACT_ADDRESS,
-          },
-          fromBlock: BigInt(0),
-          toBlock: 'latest'
-        }),
-        15000
-      )
+      const allTransfersToGarden = await fetchAlchemyTransfers({
+        contractAddress: RH_CONTRACT_ADDRESS,
+        toAddress: GARDEN_CONTRACT_ADDRESS,
+      })
 
       // Get ALL transfers FROM garden (to anyone)
-      const allTransfersFromGarden = await withTimeout(
-        publicClient!.getLogs({
-          address: RH_CONTRACT_ADDRESS,
-          event: parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)'),
-          args: {
-            from: GARDEN_CONTRACT_ADDRESS,
-          },
-          fromBlock: BigInt(0),
-          toBlock: 'latest'
-        }),
-        15000
-      )
+      const allTransfersFromGarden = await fetchAlchemyTransfers({
+        contractAddress: RH_CONTRACT_ADDRESS,
+        fromAddress: GARDEN_CONTRACT_ADDRESS,
+      })
 
       // Calculate currently planted tokens (entire garden)
       const gardenTokenCounts = new Map<number, { planted: number, uprooted: number }>()
       
       // Count all plant transfers
-      ;(allTransfersToGarden as any[]).forEach((log: any) => {
-        const tokenId = Number(log.args.tokenId)
+      allTransfersToGarden.forEach((transfer) => {
+        if (!isValidTokenId(transfer.tokenId)) return
+        const tokenId = transfer.tokenId
         const counts = gardenTokenCounts.get(tokenId) || { planted: 0, uprooted: 0 }
         counts.planted++
         gardenTokenCounts.set(tokenId, counts)
       })
       
       // Count all uproot transfers  
-      ;(allTransfersFromGarden as any[]).forEach((log: any) => {
-        const tokenId = Number(log.args.tokenId)
+      allTransfersFromGarden.forEach((transfer) => {
+        if (!isValidTokenId(transfer.tokenId)) return
+        const tokenId = transfer.tokenId
         const counts = gardenTokenCounts.get(tokenId) || { planted: 0, uprooted: 0 }
         counts.uprooted++
         gardenTokenCounts.set(tokenId, counts)
@@ -638,73 +592,56 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
       let lastWorkGardenTime = 0
       let nextWorkGardenTime = 0
       
-      try {
-        // Get transaction logs for garden contract interactions
-        const gardenTransactions = await withTimeout(
-          publicClient!.getLogs({
-            address: GARDEN_CONTRACT_ADDRESS,
-            fromBlock: BigInt(0),
-            toBlock: 'latest'
-          }),
-          10000
-        )
+      // Estimate work_garden timing based on growth readiness
+      if (currentlyPlantedInGarden.length > 0 && readyToGrowCount < currentlyPlantedInGarden.length) {
+        lastWorkGardenTime = now - 3600 // Estimate 1 hour ago
+      }
 
-        // For now, estimate based on last grow events in garden
-        if (currentlyPlantedInGarden.length > 0 && readyToGrowCount < currentlyPlantedInGarden.length) {
-          // If some tokens have grown recently, estimate work_garden was called
-          lastWorkGardenTime = now - 3600 // Estimate 1 hour ago
-        }
+      if (currentlyPlantedInGarden.length > readyToGrowCount) {
+        let earliestNextReady = Number.MAX_SAFE_INTEGER
+        
+        for (const tokenId of currentlyPlantedInGarden) {
+          try {
+            const owner = await withTimeout(
+              readContract(wagmiConfig, {
+                address: RH_CONTRACT_ADDRESS,
+                abi: rhAbi,
+                functionName: "ownerOf",
+                args: [BigInt(tokenId)],
+              }),
+              3000
+            ) as string
 
-        // Calculate when next tokens will be ready
-        if (currentlyPlantedInGarden.length > readyToGrowCount) {
-          // Find the token that will be ready soonest
-          let earliestNextReady = Number.MAX_SAFE_INTEGER
-          
-          for (const tokenId of currentlyPlantedInGarden) {
-            try {
-              const owner = await withTimeout(
+            if (owner.toLowerCase() === GARDEN_CONTRACT_ADDRESS.toLowerCase()) {
+              const tokenInfo = await withTimeout(
                 readContract(wagmiConfig, {
                   address: RH_CONTRACT_ADDRESS,
                   abi: rhAbi,
-                  functionName: "ownerOf",
+                  functionName: "circleData",
                   args: [BigInt(tokenId)],
                 }),
                 3000
-              ) as string
+              )
 
-              if (owner.toLowerCase() === GARDEN_CONTRACT_ADDRESS.toLowerCase()) {
-                const tokenInfo = await withTimeout(
-                  readContract(wagmiConfig, {
-                    address: RH_CONTRACT_ADDRESS,
-                    abi: rhAbi,
-                    functionName: "circleData",
-                    args: [BigInt(tokenId)],
-                  }),
-                  3000
-                )
-
-                const lastGrowTime = Number((tokenInfo as any)[1])
-                const growTimeElapsed = now - lastGrowTime
-                
-                // If not ready yet, calculate when it will be ready
-                if (lastGrowTime > 0 && growTimeElapsed < 86400) {
-                  const nextReadyTime = lastGrowTime + 86400
-                  if (nextReadyTime < earliestNextReady) {
-                    earliestNextReady = nextReadyTime
-                  }
+              const lastGrowTime = Number((tokenInfo as any)[1])
+              const growTimeElapsed = now - lastGrowTime
+              
+              // If not ready yet, calculate when it will be ready
+              if (lastGrowTime > 0 && growTimeElapsed < 86400) {
+                const nextReadyTime = lastGrowTime + 86400
+                if (nextReadyTime < earliestNextReady) {
+                  earliestNextReady = nextReadyTime
                 }
               }
-            } catch (error) {
-              // Skip this token
             }
-          }
-          
-          if (earliestNextReady < Number.MAX_SAFE_INTEGER) {
-            nextWorkGardenTime = earliestNextReady
+          } catch {
+            // Ignore single token failures
           }
         }
-      } catch (error) {
-        logger.warn("Could not fetch work_garden timing:", error)
+        
+        if (earliestNextReady < Number.MAX_SAFE_INTEGER) {
+          nextWorkGardenTime = earliestNextReady
+        }
       }
 
       setGardenStats({
