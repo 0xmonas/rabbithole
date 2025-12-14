@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { readContract } from "@wagmi/core"
+import { readContracts } from "@wagmi/core"
 import { wagmiConfig, CONTRACT_ADDRESS } from "@/config/wagmi"
 import { logger } from "@/lib/logger"
 import { fetchAlchemyTransfers } from "@/lib/alchemy-transfers"
@@ -163,51 +163,53 @@ export function useLeaderboard(currentUserAddress?: string | null) {
     
     logger.debug(`Processed ownership for ${tokenOwnership.size} tokens`)
     
-    // Step 3: Batch fetch circle data for all tokens (following useNFTs batch pattern)
-    logger.info("🔢 Batch fetching circle data for all tokens...")
+    // Step 3: Use Multicall to batch fetch ALL circle data in minimal RPC calls
+    logger.info("🔢 Using Multicall to batch fetch circle data (optimized)...")
     
     const tokenIds = Array.from(tokenOwnership.keys())
-    const batchSize = 50 // Process in batches for performance
+    const MULTICALL_BATCH_SIZE = 200 // Multicall can handle large batches efficiently
     
-    for (let i = 0; i < tokenIds.length; i += batchSize) {
-      const batch = tokenIds.slice(i, i + batchSize)
+    for (let i = 0; i < tokenIds.length; i += MULTICALL_BATCH_SIZE) {
+      const batch = tokenIds.slice(i, i + MULTICALL_BATCH_SIZE)
       
-      const batchPromises = batch.map(async (tokenId) => {
-        try {
+      // Build multicall contracts array
+      const contracts = batch.map(tokenId => ({
+        address: CONTRACT_ADDRESS,
+        abi: rabbitHoleAbi,
+        functionName: "circleData" as const,
+        args: [BigInt(tokenId)],
+      }))
+      
+      try {
+        // Single RPC call for entire batch using Multicall3!
+        const results = await withTimeout(
+          readContracts(wagmiConfig, { contracts }),
+          15000 // 15 seconds for large batch
+        )
+        
+        // Process results
+        results.forEach((result, index) => {
+          const tokenId = batch[index]
           const ownership = tokenOwnership.get(tokenId)!
           
-          const tokenInfo = await withTimeout(
-            readContract(wagmiConfig, {
-              address: CONTRACT_ADDRESS,
-              abi: rabbitHoleAbi,
-              functionName: "circleData",
-              args: [BigInt(tokenId)],
-            }),
-            3000
-          )
-          
-          const size = Number((tokenInfo as any)[0])
-          const owner = ownership.owner
-          const location = ownership.location
-          
-          // Add token to user's collection
-          if (!userTokens.has(owner)) {
-            userTokens.set(owner, [])
+          if (result.status === 'success') {
+            const size = Number((result.result as any)[0])
+            const owner = ownership.owner
+            const location = ownership.location
+            
+            if (!userTokens.has(owner)) {
+              userTokens.set(owner, [])
+            }
+            userTokens.get(owner)!.push({ id: tokenId, size, location })
+          } else {
+            logger.warn(`Failed to fetch data for token #${tokenId}`)
           }
-          
-          userTokens.get(owner)!.push({ id: tokenId, size, location })
-          
-          return { tokenId, owner, size, location }
-        } catch (error) {
-          logger.warn(`Failed to fetch data for token #${tokenId}`, error)
-          return null
-        }
-      })
-      
-      const batchResults = await Promise.all(batchPromises)
-      const validResults = batchResults.filter(r => r !== null)
-      
-      logger.debug(`Batch ${Math.floor(i / batchSize) + 1}/${Math.ceil(tokenIds.length / batchSize)}: ${validResults.length}/${batch.length} tokens processed`)
+        })
+        
+        logger.debug(`Multicall batch ${Math.floor(i / MULTICALL_BATCH_SIZE) + 1}/${Math.ceil(tokenIds.length / MULTICALL_BATCH_SIZE)}: ${batch.length} tokens in 1 RPC call`)
+      } catch (error) {
+        logger.error(`Multicall batch failed`, error)
+      }
     }
     
     logger.success(`Leaderboard data collection complete: ${userTokens.size} unique holders found`)

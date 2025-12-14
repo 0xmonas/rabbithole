@@ -80,12 +80,13 @@ const securityHeaders = [
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'", // Web3 requires unsafe-eval for wallet connections
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'", // Web3/wallet libs require eval + wasm
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com", // Allow Google Fonts
       "font-src 'self' https://fonts.gstatic.com", // Allow Google Fonts
-      "img-src 'self' data: blob: https://*.walletconnect.com", // Allow data URLs for SVG images from contracts
+      "img-src 'self' data: blob: https://*.walletconnect.com https://*.reown.com https://*.walletconnect.org", // Allow wallet provider images
       `connect-src ${connectSrc.join(' ')}`, // Allow Web3Modal, Reown, Coinbase, RPC providers
-      "frame-src 'self' https://*.walletconnect.com https://*.walletconnect.org",
+      "frame-src 'self' https://*.walletconnect.com https://*.walletconnect.org https://*.reown.com",
+      "worker-src 'self' blob:", // Allow web workers used by wallet libs
     ].join('; ')
   }
 ]

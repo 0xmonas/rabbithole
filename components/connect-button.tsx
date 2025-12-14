@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { useAccount, useDisconnect } from 'wagmi'
 import { appKit } from '@/config/wagmi'
+import { logger } from "@/lib/logger"
 
 interface ConnectButtonProps {
   large?: boolean

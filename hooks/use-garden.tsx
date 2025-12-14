@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { readContract, writeContract } from "@wagmi/core"
+import { readContract, readContracts, writeContract } from "@wagmi/core"
 import { wagmiConfig } from "@/config/wagmi"
 import { getAddress } from "viem"
 import type { NFT } from "@/types/nft"
@@ -233,105 +233,95 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
         return
       }
 
-      // Fetch NFT data for planted tokens
-      logger.debug(`🌱 Fetching data for ${currentlyPlanted.length} planted tokens...`)
-      const nftPromises = currentlyPlanted.map(async (tokenId) => {
-        try {
-          logger.debug(`🌱 Checking owner of token #${tokenId}...`)
-          
-          // Verify token is actually in garden
-          const owner = await withTimeout(
-            readContract(wagmiConfig, {
-              address: RH_CONTRACT_ADDRESS,
-              abi: rhAbi,
-              functionName: "ownerOf",
-              args: [BigInt(tokenId)],
-            }),
-            5000
-          ) as string
-
-          logger.debug(`🌱 Token #${tokenId} owner: ${owner}`)
-          logger.debug(`🌱 Garden contract: ${GARDEN_CONTRACT_ADDRESS}`)
-          logger.debug(`🌱 Owner matches garden: ${owner.toLowerCase() === GARDEN_CONTRACT_ADDRESS.toLowerCase()}`)
-
-          if (owner.toLowerCase() !== GARDEN_CONTRACT_ADDRESS.toLowerCase()) {
-            logger.debug(`🌱 Token #${tokenId} not in garden anymore (owner: ${owner})`)
-            return null // Token not in garden anymore
-          }
-
-          logger.debug(`🌱 Fetching circle data for token #${tokenId}...`)
-          
-          // Get circle data
-          const tokenInfo = await withTimeout(
-            readContract(wagmiConfig, {
-              address: RH_CONTRACT_ADDRESS,
-              abi: rhAbi,
-              functionName: "circleData",
-              args: [BigInt(tokenId)],
-            }),
-            5000
-          )
-
-          // Get token image
-          let imageUrl: string | undefined
+      // Fetch NFT data for planted tokens using Multicall (optimized)
+      logger.debug(`🌱 Using Multicall to fetch data for ${currentlyPlanted.length} planted tokens...`)
+      
+      // Build multicall contracts for ownerOf, circleData, and tokenURI
+      const ownerOfContracts = currentlyPlanted.map(tokenId => ({
+        address: RH_CONTRACT_ADDRESS,
+        abi: rhAbi,
+        functionName: "ownerOf" as const,
+        args: [BigInt(tokenId)],
+      }))
+      
+      const circleDataContracts = currentlyPlanted.map(tokenId => ({
+        address: RH_CONTRACT_ADDRESS,
+        abi: rhAbi,
+        functionName: "circleData" as const,
+        args: [BigInt(tokenId)],
+      }))
+      
+      const tokenURIContracts = currentlyPlanted.map(tokenId => ({
+        address: RH_CONTRACT_ADDRESS,
+        abi: rhAbi,
+        functionName: "tokenURI" as const,
+        args: [BigInt(tokenId)],
+      }))
+      
+      // Execute all multicalls in parallel (3 RPC calls instead of N*3)
+      const [ownerResults, circleDataResults, tokenURIResults] = await Promise.all([
+        withTimeout(readContracts(wagmiConfig, { contracts: ownerOfContracts }), 10000),
+        withTimeout(readContracts(wagmiConfig, { contracts: circleDataContracts }), 10000),
+        withTimeout(readContracts(wagmiConfig, { contracts: tokenURIContracts }), 10000),
+      ])
+      
+      const now = Math.floor(Date.now() / 1000)
+      const validNFTs: NFT[] = []
+      
+      for (let i = 0; i < currentlyPlanted.length; i++) {
+        const tokenId = currentlyPlanted[i]
+        const ownerResult = ownerResults[i]
+        const circleResult = circleDataResults[i]
+        const uriResult = tokenURIResults[i]
+        
+        // Check if token is still in garden
+        if (ownerResult.status !== 'success') continue
+        const owner = ownerResult.result as string
+        if (owner.toLowerCase() !== GARDEN_CONTRACT_ADDRESS.toLowerCase()) {
+          logger.debug(`🌱 Token #${tokenId} not in garden anymore`)
+          continue
+        }
+        
+        if (circleResult.status !== 'success') continue
+        const tokenInfo = circleResult.result as any
+        const lastGrowTime = Number(tokenInfo[1])
+        const lastShrinkTime = Number(tokenInfo[2])
+        const growTimeElapsed = now - lastGrowTime
+        const shrinkTimeElapsed = now - lastShrinkTime
+        
+        // Parse image from tokenURI if available
+        let imageUrl: string | undefined
+        if (uriResult.status === 'success') {
           try {
-            const tokenURI = await withTimeout(
-              readContract(wagmiConfig, {
-                address: RH_CONTRACT_ADDRESS,
-                abi: rhAbi,
-                functionName: "tokenURI",
-                args: [BigInt(tokenId)],
-              }),
-              5000
-            ) as string
-
-            // Parse Base64-encoded JSON metadata
+            const tokenURI = uriResult.result as string
             if (tokenURI.startsWith('data:application/json;base64,')) {
               const base64Data = tokenURI.replace('data:application/json;base64,', '')
               const jsonData = atob(base64Data)
               const metadata = JSON.parse(jsonData)
-              
               if (metadata.image) {
                 imageUrl = metadata.image
-                logger.debug(`🌱 Token #${tokenId} image extracted from contract`)
               }
             }
-          } catch (error) {
-            logger.warn(`⚠️ Could not fetch garden image for token #${tokenId}:`, error)
+          } catch (e) {
+            // Ignore image parsing errors
           }
-
-          logger.debug(`🌱 Token #${tokenId} data:`, {
-            size: Number((tokenInfo as any)[0]),
-            lastGrowTime: Number((tokenInfo as any)[1]),
-            lastShrinkTime: Number((tokenInfo as any)[2])
-          })
-
-          const now = Math.floor(Date.now() / 1000)
-          const lastGrowTime = Number((tokenInfo as any)[1])
-          const lastShrinkTime = Number((tokenInfo as any)[2])
-          const growTimeElapsed = now - lastGrowTime
-          const shrinkTimeElapsed = now - lastShrinkTime
-
-          return {
-            id: Number(tokenId),
-            size: Number((tokenInfo as any)[0]),
-            minSize: 1,
-            maxSize: 1000,
-            lastGrowTime: lastGrowTime,
-            lastShrinkTime: lastShrinkTime,
-            growCooldownRemaining: lastGrowTime === 0 ? 0 : growTimeElapsed >= 86400 ? 0 : 86400 - growTimeElapsed,
-            shrinkCooldownRemaining: lastShrinkTime === 0 ? 0 : shrinkTimeElapsed >= 86400 ? 0 : 86400 - shrinkTimeElapsed,
-            imageUrl: imageUrl, // 🎯 REAL CONTRACT-GENERATED IMAGE!
-            history: [], // Garden history can be added later
-          } as NFT
-        } catch (error) {
-          logger.error(`💥 Error fetching garden token ${tokenId}:`, error)
-          return null
         }
-      })
-
-      const nftResults = await Promise.all(nftPromises)
-      const validNFTs = nftResults.filter((nft): nft is NFT => nft !== null)
+        
+        validNFTs.push({
+          id: Number(tokenId),
+          size: Number(tokenInfo[0]),
+          minSize: 1,
+          maxSize: 1000,
+          lastGrowTime,
+          lastShrinkTime,
+          growCooldownRemaining: lastGrowTime === 0 ? 0 : growTimeElapsed >= 86400 ? 0 : 86400 - growTimeElapsed,
+          shrinkCooldownRemaining: lastShrinkTime === 0 ? 0 : shrinkTimeElapsed >= 86400 ? 0 : 86400 - shrinkTimeElapsed,
+          imageUrl,
+          history: [],
+        })
+      }
+      
+      logger.debug(`🌱 Loaded ${validNFTs.length} garden NFTs in 3 RPC calls (Multicall)`)
 
       logger.debug(`🌱 Successfully loaded ${validNFTs.length} garden NFTs:`, validNFTs.map(nft => `#${nft.id} (size: ${nft.size})`))
       setGardenNFTs(validNFTs)
@@ -527,45 +517,50 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
 
       logger.debug(`🌍 Total tokens in garden: ${currentlyPlantedInGarden.length}`)
 
-      // Fetch full data for all garden tokens in parallel
-      const tokenDataPromises = currentlyPlantedInGarden.map(async (tokenId) => {
-        try {
-          const owner = await withTimeout(
-            readContract(wagmiConfig, {
-              address: RH_CONTRACT_ADDRESS,
-              abi: rhAbi,
-              functionName: "ownerOf",
-              args: [BigInt(tokenId)],
-            }),
-            3000
-          ) as string
-
-          if (owner.toLowerCase() !== GARDEN_CONTRACT_ADDRESS.toLowerCase()) {
-            return null // No longer in garden
-          }
-
-          const tokenInfo = await withTimeout(
-            readContract(wagmiConfig, {
-              address: RH_CONTRACT_ADDRESS,
-              abi: rhAbi,
-              functionName: "circleData",
-              args: [BigInt(tokenId)],
-            }),
-            3000
-          )
-          
-          return {
-            id: tokenId,
-            size: Number((tokenInfo as any)[0]),
-            lastGrowTime: Number((tokenInfo as any)[1])
-          }
-        } catch (error) {
-          logger.warn(`Could not check token #${tokenId} data for community view:`, error)
-          return null
-        }
-      })
-
-      const allTokensData = (await Promise.all(tokenDataPromises)).filter((t): t is {id: number, size: number, lastGrowTime: number} => t !== null)
+      // Use Multicall to fetch all garden token data efficiently
+      logger.debug(`🌍 Using Multicall to fetch data for ${currentlyPlantedInGarden.length} garden tokens...`)
+      
+      const ownerOfContracts = currentlyPlantedInGarden.map(tokenId => ({
+        address: RH_CONTRACT_ADDRESS,
+        abi: rhAbi,
+        functionName: "ownerOf" as const,
+        args: [BigInt(tokenId)],
+      }))
+      
+      const circleDataContracts = currentlyPlantedInGarden.map(tokenId => ({
+        address: RH_CONTRACT_ADDRESS,
+        abi: rhAbi,
+        functionName: "circleData" as const,
+        args: [BigInt(tokenId)],
+      }))
+      
+      // Execute both multicalls in parallel (2 RPC calls instead of N*2)
+      const [ownerResults, circleDataResults] = await Promise.all([
+        withTimeout(readContracts(wagmiConfig, { contracts: ownerOfContracts }), 15000),
+        withTimeout(readContracts(wagmiConfig, { contracts: circleDataContracts }), 15000),
+      ])
+      
+      const allTokensData: {id: number, size: number, lastGrowTime: number}[] = []
+      
+      for (let i = 0; i < currentlyPlantedInGarden.length; i++) {
+        const tokenId = currentlyPlantedInGarden[i]
+        const ownerResult = ownerResults[i]
+        const circleResult = circleDataResults[i]
+        
+        if (ownerResult.status !== 'success' || circleResult.status !== 'success') continue
+        
+        const owner = ownerResult.result as string
+        if (owner.toLowerCase() !== GARDEN_CONTRACT_ADDRESS.toLowerCase()) continue
+        
+        const tokenInfo = circleResult.result as any
+        allTokensData.push({
+          id: tokenId,
+          size: Number(tokenInfo[0]),
+          lastGrowTime: Number(tokenInfo[1])
+        })
+      }
+      
+      logger.debug(`🌍 Fetched ${allTokensData.length} garden tokens in 2 RPC calls (Multicall)`)
 
       // Set community tokens for visualizer
       setCommunityTokens(allTokensData.map(t => ({id: t.id, size: t.size})))
@@ -597,47 +592,20 @@ export function useGarden(address: string | null, onSuccess?: () => void | Promi
         lastWorkGardenTime = now - 3600 // Estimate 1 hour ago
       }
 
+      // Calculate next work garden time from already-fetched data (no extra RPC calls!)
       if (currentlyPlantedInGarden.length > readyToGrowCount) {
         let earliestNextReady = Number.MAX_SAFE_INTEGER
         
-        for (const tokenId of currentlyPlantedInGarden) {
-          try {
-            const owner = await withTimeout(
-              readContract(wagmiConfig, {
-                address: RH_CONTRACT_ADDRESS,
-                abi: rhAbi,
-                functionName: "ownerOf",
-                args: [BigInt(tokenId)],
-              }),
-              3000
-            ) as string
-
-            if (owner.toLowerCase() === GARDEN_CONTRACT_ADDRESS.toLowerCase()) {
-              const tokenInfo = await withTimeout(
-                readContract(wagmiConfig, {
-                  address: RH_CONTRACT_ADDRESS,
-                  abi: rhAbi,
-                  functionName: "circleData",
-                  args: [BigInt(tokenId)],
-                }),
-                3000
-              )
-
-              const lastGrowTime = Number((tokenInfo as any)[1])
-              const growTimeElapsed = now - lastGrowTime
-              
-              // If not ready yet, calculate when it will be ready
-              if (lastGrowTime > 0 && growTimeElapsed < 86400) {
-                const nextReadyTime = lastGrowTime + 86400
-                if (nextReadyTime < earliestNextReady) {
-                  earliestNextReady = nextReadyTime
-                }
-              }
+        allTokensData.forEach(token => {
+          const growTimeElapsed = now - token.lastGrowTime
+          // If not ready yet, calculate when it will be ready
+          if (token.lastGrowTime > 0 && growTimeElapsed < 86400) {
+            const nextReadyTime = token.lastGrowTime + 86400
+            if (nextReadyTime < earliestNextReady) {
+              earliestNextReady = nextReadyTime
             }
-          } catch {
-            // Ignore single token failures
           }
-        }
+        })
         
         if (earliestNextReady < Number.MAX_SAFE_INTEGER) {
           nextWorkGardenTime = earliestNextReady

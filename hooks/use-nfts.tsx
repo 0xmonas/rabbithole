@@ -1,11 +1,11 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { readContract, getPublicClient } from "@wagmi/core"
+import { readContract, readContracts } from "@wagmi/core"
 import { wagmiConfig, CONTRACT_ADDRESS } from "@/config/wagmi"
-import { parseAbiItem } from "viem"
 import type { NFT } from "@/types/nft"
 import { logger } from "@/lib/logger"
+import { fetchAlchemyTransfers } from "@/lib/alchemy-transfers"
 
 // ABI for the RabbitHole contract
 const rabbitHoleAbi = [
@@ -40,15 +40,6 @@ const rabbitHoleAbi = [
 const DAILY_COOLDOWN = 86400 // 24 hours in seconds
 const GARDEN_CONTRACT_ADDRESS = "0x2940574AF75D350BF37Ceb73CA5dE8e5ADA425c4" as `0x${string}`
 
-// 🔥 ELITE LEVEL: Action History Events - FIXED event signatures!
-const ACTION_EVENTS = {
-  Transfer: parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)'),
-  CircleGrown: parseAbiItem('event CircleGrown(uint256 tokenId, uint256 newSize)'), // ✅ FIXED: tokenId NOT indexed
-  CircleShrunk: parseAbiItem('event CircleShrunk(uint256 tokenId, uint256 newSize)'), // ✅ FIXED: tokenId NOT indexed  
-  CirclesMerged: parseAbiItem('event CirclesMerged(uint256[] mergedTokenIds, uint256 newTokenId, uint256 remainderTokenId)'),
-  SpecialMetadataSet: parseAbiItem('event SpecialMetadataSet(uint256 tokenId, string metadata)'), // ✅ FIXED: tokenId NOT indexed
-} as const
-
 // Helper function with timeout
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return Promise.race([
@@ -57,192 +48,6 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
       setTimeout(() => reject(new Error(`Timeout after ${timeoutMs}ms`)), timeoutMs)
     )
   ])
-}
-
-// 🎯 ELITE FUNCTION: Fetch comprehensive action history for a token
-async function fetchTokenHistory(tokenId: number): Promise<{ action: string; timestamp: number; txHash: string }[]> {
-  logger.debug(`Fetching action history for token #${tokenId}`)
-  
-  try {
-    const publicClient = getPublicClient(wagmiConfig)
-    const history: { action: string; timestamp: number; blockNumber: number; txHash: string }[] = []
-
-    // 📊 1. Fetch Transfer events (Mint, Transfers)
-    const transferLogs = await withTimeout(
-      publicClient!.getLogs({
-        address: CONTRACT_ADDRESS,
-        event: ACTION_EVENTS.Transfer,
-        args: { tokenId: BigInt(tokenId) },
-        fromBlock: BigInt(0),
-        toBlock: 'latest'
-      }),
-      8000
-    )
-
-    for (const log of transferLogs as any[]) {
-      const block = await publicClient!.getBlock({ blockNumber: log.blockNumber })
-      if (log.args.from === '0x0000000000000000000000000000000000000000') {
-        history.push({
-          action: `Minted to ${log.args.to.slice(0, 6)}...${log.args.to.slice(-4)}`,
-          timestamp: Number(block.timestamp),
-          blockNumber: Number(log.blockNumber),
-          txHash: log.transactionHash
-        })
-      } else if (log.args.to.toLowerCase() === GARDEN_CONTRACT_ADDRESS.toLowerCase()) {
-        history.push({
-          action: `Planted in Garden`,
-          timestamp: Number(block.timestamp),
-          blockNumber: Number(log.blockNumber),
-          txHash: log.transactionHash
-        })
-      } else if (log.args.from.toLowerCase() === GARDEN_CONTRACT_ADDRESS.toLowerCase()) {
-        history.push({
-          action: `Uprooted from Garden`,
-          timestamp: Number(block.timestamp),
-          blockNumber: Number(log.blockNumber),
-          txHash: log.transactionHash
-        })
-      } else {
-        history.push({
-          action: `Transferred from ${log.args.from.slice(0, 6)}...${log.args.from.slice(-4)} to ${log.args.to.slice(0, 6)}...${log.args.to.slice(-4)}`,
-          timestamp: Number(block.timestamp),
-          blockNumber: Number(log.blockNumber),
-          txHash: log.transactionHash
-        })
-      }
-    }
-
-    // 📊 2. Fetch CircleGrown events (tokenId NOT indexed, need manual filter)
-    try {
-      const allGrownLogs = await withTimeout(
-        publicClient!.getLogs({
-          address: CONTRACT_ADDRESS,
-          event: ACTION_EVENTS.CircleGrown,
-          fromBlock: BigInt(0),
-          toBlock: 'latest'
-        }),
-        12000
-      )
-
-      // Filter for our specific tokenId (since tokenId is not indexed)
-      const relevantGrowLogs = (allGrownLogs as any[]).filter((log: any) => {
-        return Number(log.args.tokenId) === tokenId
-      })
-
-      logger.debug(`Token #${tokenId}: Found ${relevantGrowLogs.length} grow events from ${(allGrownLogs as any[]).length} total`)
-      for (const log of relevantGrowLogs) {
-        const block = await publicClient!.getBlock({ blockNumber: log.blockNumber })
-        history.push({
-          action: `Grown to size ${log.args.newSize}`,
-          timestamp: Number(block.timestamp),
-          blockNumber: Number(log.blockNumber),
-          txHash: log.transactionHash
-        })
-      }
-    } catch (error) {
-      logger.warn(`Failed to fetch grow events for token #${tokenId}`, error)
-    }
-
-    // 📊 3. Fetch CircleShrunk events (tokenId NOT indexed, need manual filter)
-    try {
-      const allShrunkLogs = await withTimeout(
-        publicClient!.getLogs({
-          address: CONTRACT_ADDRESS,
-          event: ACTION_EVENTS.CircleShrunk,
-          fromBlock: BigInt(0),
-          toBlock: 'latest'
-        }),
-        12000
-      )
-
-      // Filter for our specific tokenId (since tokenId is not indexed)
-      const relevantShrinkLogs = (allShrunkLogs as any[]).filter((log: any) => {
-        return Number(log.args.tokenId) === tokenId
-      })
-
-      logger.debug(`Token #${tokenId}: Found ${relevantShrinkLogs.length} shrink events from ${(allShrunkLogs as any[]).length} total`)
-      for (const log of relevantShrinkLogs) {
-        const block = await publicClient!.getBlock({ blockNumber: log.blockNumber })
-        history.push({
-          action: `Shrunk to size ${log.args.newSize}`,
-          timestamp: Number(block.timestamp),
-          blockNumber: Number(log.blockNumber),
-          txHash: log.transactionHash
-        })
-      }
-    } catch (error) {
-      logger.warn(`Failed to fetch shrink events for token #${tokenId}`, error)
-    }
-
-    // 📊 4. Fetch CirclesMerged events (as source)
-    try {
-      const mergedLogs = await withTimeout(
-        publicClient!.getLogs({
-          address: CONTRACT_ADDRESS,
-          event: ACTION_EVENTS.CirclesMerged,
-          fromBlock: BigInt(0),
-          toBlock: 'latest'
-        }),
-        12000
-      )
-
-      logger.debug(`Token #${tokenId}: Found ${(mergedLogs as any[]).length} merge events to check`)
-      for (const log of mergedLogs as any[]) {
-        if (log.args.mergedTokenIds.includes(BigInt(tokenId))) {
-          const block = await publicClient!.getBlock({ blockNumber: log.blockNumber })
-                      history.push({
-              action: `Merged with other tokens → Token #${log.args.newTokenId}`,
-              timestamp: Number(block.timestamp),
-              blockNumber: Number(log.blockNumber),
-              txHash: log.transactionHash
-            })
-        }
-      }
-    } catch (error) {
-      logger.warn(`Failed to fetch merge events for token #${tokenId}`, error)
-    }
-
-    // 📊 5. Fetch SpecialMetadataSet events (tokenId NOT indexed, need manual filter)
-    try {
-      const allMetadataLogs = await withTimeout(
-        publicClient!.getLogs({
-          address: CONTRACT_ADDRESS,
-          event: ACTION_EVENTS.SpecialMetadataSet,
-          fromBlock: BigInt(0),
-          toBlock: 'latest'
-        }),
-        12000
-      )
-
-      // Filter for our specific tokenId (since tokenId is not indexed)
-      const relevantMetadataLogs = (allMetadataLogs as any[]).filter((log: any) => {
-        return Number(log.args.tokenId) === tokenId
-      })
-
-      logger.debug(`Token #${tokenId}: Found ${relevantMetadataLogs.length} metadata events from ${(allMetadataLogs as any[]).length} total`)
-      for (const log of relevantMetadataLogs) {
-        const block = await publicClient!.getBlock({ blockNumber: log.blockNumber })
-        history.push({
-          action: `Special metadata set (1/1 status)`,
-          timestamp: Number(block.timestamp),
-          blockNumber: Number(log.blockNumber),
-          txHash: log.transactionHash
-        })
-      }
-    } catch (error) {
-      logger.warn(`Failed to fetch metadata events for token #${tokenId}`, error)
-    }
-
-    // Sort by block number (chronological order)
-    const sortedHistory = history.sort((a, b) => a.blockNumber - b.blockNumber)
-
-    logger.debug(`Token #${tokenId} history: ${sortedHistory.length} actions found`)
-    return sortedHistory
-
-  } catch (error) {
-    logger.error(`Error fetching history for token #${tokenId}`, error)
-    return []
-  }
 }
 
 export function useNFTs(address: string | null) {
@@ -291,9 +96,6 @@ export function useNFTs(address: string | null) {
         logger.warn(`Could not fetch image for token #${tokenId}`, error)
       }
 
-      // Fetch comprehensive action history
-      const history = await fetchTokenHistory(tokenId)
-
       const now = Math.floor(Date.now() / 1000)
       const size = Number((tokenInfo as any)[0])
       const lastGrowTime = Number((tokenInfo as any)[1])
@@ -309,7 +111,7 @@ export function useNFTs(address: string | null) {
         growCooldownRemaining: Math.max(0, (lastGrowTime + DAILY_COOLDOWN) - now),
         shrinkCooldownRemaining: Math.max(0, (lastShrinkTime + DAILY_COOLDOWN) - now),
         imageUrl,
-        history
+        history: [] // History disabled due to Alchemy free tier limitations
       }
     } catch (error) {
       logger.error(`Error fetching data for token #${tokenId}`, error)
@@ -318,7 +120,7 @@ export function useNFTs(address: string | null) {
   }
 
   const fetchAllNFTs = async () => {
-    logger.info("Starting professional NFT fetching using Transfer Events")
+    logger.info("Starting NFT fetching using Alchemy Transfer API")
     logger.debug("Fetching for address", { address })
     
     if (!address) {
@@ -336,10 +138,10 @@ export function useNFTs(address: string | null) {
       // Quick balance check for validation
       const balance = await withTimeout(
         readContract(wagmiConfig, {
-        address: CONTRACT_ADDRESS,
-        abi: rabbitHoleAbi,
+          address: CONTRACT_ADDRESS,
+          abi: rabbitHoleAbi,
           functionName: "balanceOf",
-        args: [address as `0x${string}`],
+          args: [address as `0x${string}`],
         }),
         5000
       )
@@ -352,91 +154,75 @@ export function useNFTs(address: string | null) {
         return
       }
 
-      logger.info("Step 2: Query Transfer Events")
+      logger.info("Step 2: Query Alchemy Transfer API (works with free tier)")
       
-      // Query Transfer events - this is how REAL NFT dApps work!
-      // Transfer(address from, address to, uint256 tokenId)
-      const publicClient = getPublicClient(wagmiConfig)
-      
-      const transferLogs = await withTimeout(
-        publicClient!.getLogs({
-          address: CONTRACT_ADDRESS,
-          event: parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)'),
-          args: {
-            to: address as `0x${string}`, // Tokens transferred TO this address
-          },
-          fromBlock: BigInt(0), // From contract deployment
-          toBlock: 'latest'
+      // Use Alchemy's alchemy_getAssetTransfers API - works with free tier!
+      const transfersToUser = await withTimeout(
+        fetchAlchemyTransfers({
+          contractAddress: CONTRACT_ADDRESS,
+          toAddress: address,
         }),
-        10000 // 10 seconds for all logs
+        15000
       )
 
-      logger.debug(`Found ${(transferLogs as any[]).length} Transfer events TO this address`)
+      logger.debug(`Found ${transfersToUser.length} transfers TO this address`)
 
-      // Get tokens that were transferred OUT of this address  
-      const transferOutLogs = await withTimeout(
-        publicClient!.getLogs({
-            address: CONTRACT_ADDRESS,
-          event: parseAbiItem('event Transfer(address indexed from, address indexed to, uint256 indexed tokenId)'),
-          args: {
-            from: address as `0x${string}`, // Tokens transferred FROM this address
-          },
-          fromBlock: BigInt(0),
-          toBlock: 'latest'
+      const transfersFromUser = await withTimeout(
+        fetchAlchemyTransfers({
+          contractAddress: CONTRACT_ADDRESS,
+          fromAddress: address,
         }),
-        10000
+        15000
       )
 
-      logger.debug(`Found ${(transferOutLogs as any[]).length} Transfer events FROM this address`)
+      logger.debug(`Found ${transfersFromUser.length} transfers FROM this address`)
 
       const addressLower = address.toLowerCase()
 
-      // ✅ FIXED: Garden transfers need special handling
-      // Don't count garden transfers as "sent away" - they're temporary deposits
-      const nonGardenTransferOutLogs = (transferOutLogs as any[]).filter((log: any) =>
-        log.args.to.toLowerCase() !== GARDEN_CONTRACT_ADDRESS.toLowerCase()
-      )
-
+      // Build ownership map by replaying transfer history
       type TransferEvent = {
         tokenId: number
         direction: "in" | "out"
-        blockNumber: bigint
-        logIndex: number
+        blockNum: string
       }
 
       const transferEvents: TransferEvent[] = []
 
-      // Track inbound transfers first
-      ;(transferLogs as any[]).forEach((log: any) => {
-        transferEvents.push({
-          tokenId: Number(log.args.tokenId),
-          direction: "in",
-          blockNumber: log.blockNumber,
-          logIndex: Number(log.logIndex ?? 0)
-        })
-      })
-
-      // Track outbound transfers (excluding self-transfers and garden deposits)
-      ;(nonGardenTransferOutLogs as any[]).forEach((log: any) => {
-        const toAddress = log.args.to?.toLowerCase?.() || ""
-        if (toAddress === addressLower) {
-          // Self-transfer – no net change in ownership
-          return
+      // Track inbound transfers
+      transfersToUser.forEach((transfer) => {
+        if (transfer.tokenId !== null) {
+          transferEvents.push({
+            tokenId: transfer.tokenId,
+            direction: "in",
+            blockNum: transfer.blockNum
+          })
         }
-
-        transferEvents.push({
-          tokenId: Number(log.args.tokenId),
-          direction: "out",
-          blockNumber: log.blockNumber,
-          logIndex: Number(log.logIndex ?? 0)
-        })
       })
 
-      // Sort by block number then log index to replay history in order
+      // Track outbound transfers (excluding garden deposits)
+      transfersFromUser.forEach((transfer) => {
+        if (transfer.tokenId !== null) {
+          // Don't count garden deposits as "sent away"
+          if (transfer.to.toLowerCase() === GARDEN_CONTRACT_ADDRESS.toLowerCase()) {
+            return
+          }
+          // Don't count self-transfers
+          if (transfer.to.toLowerCase() === addressLower) {
+            return
+          }
+          transferEvents.push({
+            tokenId: transfer.tokenId,
+            direction: "out",
+            blockNum: transfer.blockNum
+          })
+        }
+      })
+
+      // Sort by block number to replay history in order
       transferEvents.sort((a, b) => {
-        const blockDiff = Number(a.blockNumber) - Number(b.blockNumber)
-        if (blockDiff !== 0) return blockDiff
-        return a.logIndex - b.logIndex
+        const blockA = parseInt(a.blockNum, 16)
+        const blockB = parseInt(b.blockNum, 16)
+        return blockA - blockB
       })
 
       const ownedTokenSet = new Set<number>()
@@ -462,21 +248,87 @@ export function useNFTs(address: string | null) {
         return
       }
 
-      logger.info("Step 3: Batch fetch NFT data with action history for owned tokens")
+      logger.info("Step 3: Using Multicall to batch fetch NFT data (optimized)")
       
-      // Fetch all NFT data in parallel - MUCH faster!
-      const nftPromises = ownedTokenIds.map(tokenId => fetchNFTData(tokenId))
-      const nftResults = await Promise.all(nftPromises)
-      const validNFTs = nftResults.filter((nft): nft is NFT => nft !== null)
+      // Build multicall contracts for circleData and tokenURI
+      const circleDataContracts = ownedTokenIds.map(tokenId => ({
+        address: CONTRACT_ADDRESS,
+        abi: rabbitHoleAbi,
+        functionName: "circleData" as const,
+        args: [BigInt(tokenId)],
+      }))
+      
+      const tokenURIContracts = ownedTokenIds.map(tokenId => ({
+        address: CONTRACT_ADDRESS,
+        abi: rabbitHoleAbi,
+        functionName: "tokenURI" as const,
+        args: [BigInt(tokenId)],
+      }))
+      
+      // Execute both multicalls (2 RPC calls instead of N*2)
+      const [circleDataResults, tokenURIResults] = await Promise.all([
+        withTimeout(readContracts(wagmiConfig, { contracts: circleDataContracts }), 10000),
+        withTimeout(readContracts(wagmiConfig, { contracts: tokenURIContracts }), 10000),
+      ])
+      
+      const now = Math.floor(Date.now() / 1000)
+      const validNFTs: NFT[] = []
+      
+      for (let i = 0; i < ownedTokenIds.length; i++) {
+        const tokenId = ownedTokenIds[i]
+        const circleResult = circleDataResults[i]
+        const uriResult = tokenURIResults[i]
+        
+        if (circleResult.status !== 'success') {
+          logger.warn(`Failed to fetch circleData for token #${tokenId}`)
+          continue
+        }
+        
+        const tokenInfo = circleResult.result as any
+        const size = Number(tokenInfo[0])
+        const lastGrowTime = Number(tokenInfo[1])
+        const lastShrinkTime = Number(tokenInfo[2])
+        
+        // Parse image from tokenURI if available
+        let imageUrl: string | undefined
+        if (uriResult.status === 'success') {
+          try {
+            const tokenURI = uriResult.result as string
+            if (tokenURI.startsWith('data:application/json;base64,')) {
+              const base64Data = tokenURI.replace('data:application/json;base64,', '')
+              const jsonData = atob(base64Data)
+              const metadata = JSON.parse(jsonData)
+              if (metadata.image) {
+                imageUrl = metadata.image
+              }
+            }
+          } catch (e) {
+            // Ignore image parsing errors
+          }
+        }
+        
+        validNFTs.push({
+          id: tokenId,
+          size,
+          minSize: 1,
+          maxSize: 1000,
+          lastGrowTime,
+          lastShrinkTime,
+          growCooldownRemaining: Math.max(0, (lastGrowTime + DAILY_COOLDOWN) - now),
+          shrinkCooldownRemaining: Math.max(0, (lastShrinkTime + DAILY_COOLDOWN) - now),
+          imageUrl,
+          history: []
+        })
+      }
 
-      logger.success(`Loaded ${validNFTs.length} NFTs with complete action history`)
-      logger.debug("NFTs loaded", { nfts: validNFTs.map(nft => `#${nft.id} (size: ${nft.size}, ${nft.history?.length || 0} actions)`) })
+      logger.success(`Loaded ${validNFTs.length} NFTs in just 2 RPC calls (Multicall)`)
+      logger.debug("NFTs loaded", { nfts: validNFTs.map(nft => `#${nft.id} (size: ${nft.size})`) })
 
       setNFTs(validNFTs)
       setError(null)
 
     } catch (error: any) {
-      logger.error("Event queries might not be supported on this RPC", error)
+      logger.error("Failed to fetch NFTs", error)
       
       // Graceful fallback - don't break the UI
       setNFTs([])
