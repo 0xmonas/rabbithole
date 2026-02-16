@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"/><title>which way? which way?</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{height:100%;overflow:hidden;background:#000;font-family:'Courier New',monospace;cursor:none}
+</style>
+</head><body>
+<canvas id="c"></canvas>
+<script>
+// "which way? which way?" — the text IS the art
+// the question repeats, spirals, dissolves, rebuilds
+// every letter is a circle. every word falls into the hole.
+
+const c=document.getElementById('c'),x=c.getContext('2d');
+let W,H;
+function resize(){W=c.width=innerWidth*devicePixelRatio;H=c.height=innerHeight*devicePixelRatio;}
+addEventListener('resize',resize);resize();
+
+const phrase='which way? ';
+const letters=[];
+let charIndex=0;
+
+function spawnLetter(){
+  const ch=phrase[charIndex%phrase.length];
+  charIndex++;
+
+  // spiral starting position
+  const age=charIndex*0.15;
+  const spiralR=50+age*2;
+  const angle=age*0.7;
+
+  letters.push({
+    ch,
+    x:W/2+Math.cos(angle)*spiralR,
+    y:H/2+Math.sin(angle)*spiralR,
+    targetX:W/2+Math.cos(angle)*spiralR,
+    targetY:H/2+Math.sin(angle)*spiralR,
+    size:12+Math.random()*8,
+    alpha:0,
+    fadeIn:true,
+    rotation:angle+Math.PI/2,
+    born:performance.now(),
+    life:12000+Math.random()*8000,
+    driftAngle:angle,
+    driftR:spiralR,
+    driftSpeed:0.0002+Math.random()*0.0003,
+    falling:false,
+    fallSpeed:0,
+    fallDelay:8000+Math.random()*6000
+  });
+}
+
+// pre-spawn a bunch
+for(let i=0;i<200;i++) spawnLetter();
+
+function draw(t){
+  // near-black with slight warmth
+  x.fillStyle='rgba(8,6,10,0.12)';
+  x.fillRect(0,0,W,H);
+
+  const cx=W/2,cy=H/2;
+
+  // spawn new letters slowly
+  if(Math.random()<0.15) spawnLetter();
+
+  // trim old
+  while(letters.length>400) letters.shift();
+
+  for(let i=letters.length-1;i>=0;i--){
+    const L=letters[i];
+    const age=t-L.born;
+
+    // fade in
+    if(L.fadeIn){
+      L.alpha=Math.min(L.alpha+0.015,0.7);
+      if(L.alpha>=0.7) L.fadeIn=false;
+    }
+
+    // drift in spiral
+    L.driftAngle+=L.driftSpeed;
+    L.driftR=Math.max(L.driftR-0.02,0);
+
+    L.targetX=cx+Math.cos(L.driftAngle)*L.driftR;
+    L.targetY=cy+Math.sin(L.driftAngle)*L.driftR;
+
+    // fall into the hole when close enough or old enough
+    if(L.driftR<30||age>L.fallDelay){
+      L.falling=true;
+    }
+
+    if(L.falling){
+      L.fallSpeed+=0.08;
+      L.driftR=Math.max(L.driftR-L.fallSpeed*0.5,0);
+      L.driftAngle+=L.driftSpeed*3;
+      L.alpha*=0.97;
+      L.size*=0.995;
+
+      L.targetX=cx+Math.cos(L.driftAngle)*L.driftR;
+      L.targetY=cy+Math.sin(L.driftAngle)*L.driftR;
+    }
+
+    // smooth follow
+    L.x+=(L.targetX-L.x)*0.05;
+    L.y+=(L.targetY-L.y)*0.05;
+
+    if(L.alpha<0.01||L.driftR<2){
+      letters.splice(i,1);
+      spawnLetter();
+      continue;
+    }
+
+    // draw letter
+    x.save();
+    x.translate(L.x,L.y);
+    x.rotate(L.driftAngle+Math.PI/2);
+    x.font=`${L.size}px 'Courier New'`;
+    x.textAlign='center';
+    x.textBaseline='middle';
+    x.fillStyle=`rgba(255,255,255,${L.alpha})`;
+    x.fillText(L.ch,0,0);
+    x.restore();
+  }
+
+  // center void — the rabbit hole
+  const holeR=W*0.025;
+
+  // soft glow around hole
+  const glow=x.createRadialGradient(cx,cy,holeR*0.5,cx,cy,holeR*4);
+  glow.addColorStop(0,'rgba(0,0,0,1)');
+  glow.addColorStop(0.4,'rgba(0,0,0,0.8)');
+  glow.addColorStop(1,'rgba(0,0,0,0)');
+  x.fillStyle=glow;
+  x.beginPath();
+  x.arc(cx,cy,holeR*4,0,Math.PI*2);
+  x.fill();
+
+  // hole
+  x.beginPath();
+  x.arc(cx,cy,holeR,0,Math.PI*2);
+  x.fillStyle='#000';
+  x.fill();
+
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+document.addEventListener('dblclick',()=>{if(!document.fullscreenElement)document.documentElement.requestFullscreen();else document.exitFullscreen&&document.exitFullscreen();});
+</script>
+</body></html>

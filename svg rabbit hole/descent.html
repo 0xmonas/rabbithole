@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"/><title>descent — infinite fall</title>
+<style>*{margin:0;padding:0}html,body{height:100%;overflow:hidden;background:#000}canvas{display:block}</style>
+</head><body>
+<canvas id="c"></canvas>
+<script>
+// the viewer is falling down a tunnel made of concentric circles
+// circles rush past you, growing from center outward
+// parallax depth — some close (fast), some far (slow)
+// color shifts subtly with depth
+
+const c=document.getElementById('c'),x=c.getContext('2d');
+let W,H;
+function resize(){W=c.width=innerWidth*devicePixelRatio;H=c.height=innerHeight*devicePixelRatio;}
+addEventListener('resize',resize);resize();
+
+const rings=[];
+
+function addRing(){
+  // born at center, expands outward
+  const hue=Math.random()*360;
+  const sat=5+Math.random()*15;
+  const light=40+Math.random()*30;
+  rings.push({
+    r:0,
+    speed:1.5+Math.random()*3,
+    thickness:0.5+Math.random()*2,
+    hue,sat,light,
+    alpha:0,
+    maxAlpha:0.15+Math.random()*0.35,
+    wobble:Math.random()*Math.PI*2,
+    wobbleAmt:0.5+Math.random()*2,
+    wobbleSpeed:0.5+Math.random()*1.5,
+    segments:Math.random()>0.7, // some rings are dashed
+    born:performance.now()
+  });
+}
+
+// initial rings at various distances
+for(let i=0;i<60;i++){
+  addRing();
+  rings[rings.length-1].r=Math.random()*Math.max(W,H)*0.7;
+  rings[rings.length-1].alpha=rings[rings.length-1].maxAlpha;
+}
+
+function draw(t){
+  // subtle dark gradient
+  x.fillStyle='rgba(4,3,8,0.15)';
+  x.fillRect(0,0,W,H);
+
+  const cx=W/2,cy=H/2;
+  const maxR=Math.sqrt(cx*cx+cy*cy);
+
+  // spawn new rings from center
+  if(Math.random()<0.12) addRing();
+
+  for(let i=rings.length-1;i>=0;i--){
+    const ring=rings[i];
+
+    ring.r+=ring.speed;
+
+    // fade in near center, fade out at edges
+    if(ring.r<50){
+      ring.alpha=ring.maxAlpha*(ring.r/50);
+    } else if(ring.r>maxR*0.7){
+      ring.alpha=ring.maxAlpha*(1-(ring.r-maxR*0.7)/(maxR*0.3));
+    } else {
+      ring.alpha=ring.maxAlpha;
+    }
+
+    if(ring.r>maxR){
+      rings.splice(i,1);
+      continue;
+    }
+
+    // wobble — slight offset from center for organic feel
+    const wobX=Math.sin(t*0.001*ring.wobbleSpeed+ring.wobble)*ring.wobbleAmt;
+    const wobY=Math.cos(t*0.001*ring.wobbleSpeed*0.7+ring.wobble)*ring.wobbleAmt;
+
+    const rx=cx+wobX;
+    const ry=cy+wobY;
+
+    // color shifts as rings expand — deeper = warmer
+    const depthHue=ring.hue+ring.r*0.05;
+    const col=`hsla(${depthHue},${ring.sat}%,${ring.light}%,${ring.alpha})`;
+
+    x.beginPath();
+
+    if(ring.segments){
+      // dashed ring
+      const segCount=8+Math.floor(Math.random()*8);
+      const segAngle=Math.PI*2/segCount;
+      const gap=segAngle*0.3;
+      for(let s=0;s<segCount;s++){
+        const startA=s*segAngle+t*0.0003;
+        const endA=startA+segAngle-gap;
+        x.beginPath();
+        x.arc(rx,ry,ring.r,startA,endA);
+        x.strokeStyle=col;
+        x.lineWidth=ring.thickness*(1+ring.r*0.003);
+        x.stroke();
+      }
+    } else {
+      x.arc(rx,ry,ring.r,0,Math.PI*2);
+      x.strokeStyle=col;
+      x.lineWidth=ring.thickness*(1+ring.r*0.002);
+      x.stroke();
+    }
+  }
+
+  // depth fog at center
+  const fog=x.createRadialGradient(cx,cy,0,cx,cy,80);
+  fog.addColorStop(0,'rgba(4,3,8,0.95)');
+  fog.addColorStop(1,'rgba(4,3,8,0)');
+  x.fillStyle=fog;
+  x.beginPath();
+  x.arc(cx,cy,80,0,Math.PI*2);
+  x.fill();
+
+  // the hole
+  const holeR=W*0.012;
+  x.beginPath();
+  x.arc(cx,cy,holeR,0,Math.PI*2);
+  x.fillStyle='#000';
+  x.fill();
+
+  requestAnimationFrame(draw);
+}
+requestAnimationFrame(draw);
+document.addEventListener('dblclick',()=>{if(!document.fullscreenElement)document.documentElement.requestFullscreen();else document.exitFullscreen&&document.exitFullscreen();});
+</script>
+</body></html>

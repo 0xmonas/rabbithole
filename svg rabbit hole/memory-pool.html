@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"/><title>memory pool — reflections dissolve</title>
+<style>*{margin:0;padding:0}html,body{height:100%;overflow:hidden;background:#000}canvas{display:block}</style>
+</head><body>
+<canvas id="c"></canvas>
+<script>
+const c=document.getElementById('c'),gl=c.getContext('webgl');
+function resize(){const d=Math.max(1,devicePixelRatio||1);c.width=Math.floor(innerWidth*d);c.height=Math.floor(innerHeight*d);gl.viewport(0,0,c.width,c.height);}
+addEventListener('resize',resize);resize();
+const vs=`attribute vec2 position;void main(){gl_Position=vec4(position,0.,1.);}`;
+const fs=`
+precision highp float;
+uniform float time;
+uniform vec2 resolution;
+
+float hash(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
+float noise(vec2 p){
+  vec2 i=floor(p),f=fract(p);
+  vec2 u=f*f*(3.-2.*f);
+  return mix(mix(hash(i),hash(i+vec2(1,0)),u.x),mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),u.x),u.y);
+}
+float fbm(vec2 p){
+  float v=0.,a=.5;
+  for(int i=0;i<5;i++){v+=a*noise(p);p=mat2(.87,-.5,.5,.87)*p*2.;a*=.5;}
+  return v;
+}
+
+vec3 palette(float t){
+  // desaturated moody — dark teal to dusty mauve
+  vec3 a=vec3(.08,.1,.14);
+  vec3 b=vec3(.12,.08,.1);
+  vec3 c=vec3(.5,.5,.5);
+  vec3 d=vec3(.55,.65,.7);
+  return a+b*cos(6.28*(c*t+d));
+}
+
+void main(){
+  vec2 uv=(gl_FragCoord.xy-.5*resolution.xy)/resolution.y;
+  float t=time;
+  float r=length(uv);
+
+  // water-like domain warp
+  vec2 p=uv*3.;
+  float w1=fbm(p+vec2(t*.07,t*.09));
+  float w2=fbm(p+vec2(t*-.05,t*.06)+5.);
+  vec2 warped=p+vec2(w1,w2)*.8;
+
+  // reflection ripples — concentric circles distorted by water
+  float ripple=0.;
+  for(int i=0;i<5;i++){
+    float fi=float(i);
+    float phase=fract(fi*.2-t*.06);
+    float ripR=phase*.8+.05;
+    float ripW=.008+phase*.004;
+    float warpedR=length(warped/3.)-ripR;
+    ripple+=smoothstep(ripW,0.,abs(warpedR))*(1.-phase)*.5;
+  }
+
+  // deep pool color
+  float depth=fbm(warped*.8+vec2(0.,t*.04));
+  vec3 col=palette(depth*.5+r*.3+t*.02);
+
+  // brighten with ripples
+  col+=vec3(.15,.12,.1)*ripple;
+
+  // surface caustics
+  float caustic=0.;
+  for(int i=0;i<3;i++){
+    float fi=float(i);
+    vec2 cp=warped*(2.+fi)+vec2(t*.03*(fi+1.));
+    caustic+=abs(sin(cp.x)*sin(cp.y));
+  }
+  caustic/=3.;
+  col+=palette(caustic+.3)*.08*caustic;
+
+  // subtle bloom around center
+  float bloom=exp(-r*4.)*.08;
+  col+=palette(t*.03+.5)*bloom;
+
+  // vignette
+  col*=smoothstep(1.2,.3,r);
+
+  // film grain
+  float grain=(hash(uv*resolution.xy+vec2(t*100.))-.5)*.03;
+  col+=grain;
+
+  // the pool's dark center
+  col=mix(col,vec3(.01,.01,.02),smoothstep(.01,.0,.08-r));
+
+  gl_FragColor=vec4(col,1.);
+}`;
+
+function sh(src,t){const h=gl.createShader(t);gl.shaderSource(h,src);gl.compileShader(h);if(!gl.getShaderParameter(h,gl.COMPILE_STATUS))console.error(gl.getShaderInfoLog(h));return h;}
+const prog=gl.createProgram();gl.attachShader(prog,sh(vs,gl.VERTEX_SHADER));gl.attachShader(prog,sh(fs,gl.FRAGMENT_SHADER));gl.linkProgram(prog);
+const buf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,1,-1,-1,1,1,1]),gl.STATIC_DRAW);
+const loc=gl.getAttribLocation(prog,'position');gl.enableVertexAttribArray(loc);gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+const uT=gl.getUniformLocation(prog,'time'),uR=gl.getUniformLocation(prog,'resolution');
+function render(t){resize();gl.useProgram(prog);gl.uniform1f(uT,t*.001);gl.uniform2f(uR,c.width,c.height);gl.drawArrays(gl.TRIANGLE_STRIP,0,4);requestAnimationFrame(render);}
+requestAnimationFrame(render);
+document.addEventListener('dblclick',()=>{if(!document.fullscreenElement)document.documentElement.requestFullscreen();else document.exitFullscreen&&document.exitFullscreen();});
+</script>
+</body></html>
