@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
+import { allow, badBody, MAX_BODY, sameSite } from "@/lib/rpc-guard"
 
 const ALCHEMY_RPC_URL = process.env.ALCHEMY_RPC_URL
 
@@ -10,7 +11,22 @@ async function forwardRpcRequest(request: NextRequest) {
     )
   }
 
+  if (!sameSite(request.headers.get("origin"), request.headers.get("host"))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 })
+  }
+  const ip = request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown"
+  if (!allow(ip)) {
+    return NextResponse.json({ error: "Too many requests" }, { status: 429, headers: { "retry-after": "60" } })
+  }
+  if (Number(request.headers.get("content-length") ?? 0) > MAX_BODY) {
+    return NextResponse.json({ error: "Request too large" }, { status: 413 })
+  }
+
   const requestBody = await request.text()
+  const bad = badBody(requestBody)
+  if (bad) {
+    return NextResponse.json({ error: bad }, { status: 400 })
+  }
 
   try {
     const upstreamResponse = await fetch(ALCHEMY_RPC_URL, {
